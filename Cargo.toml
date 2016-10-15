@@ -1,0 +1,8 @@
+[package]
+name = "transcode"
+version = "0.0.1"
+authors = [ "Bjørn Uhre Arnholtz <rugkiks@gmail.com>" ]
+
+
+[dependencies]
+rustc-serialize = "0.3.19"
