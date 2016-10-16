@@ -3,6 +3,8 @@ use std::process::Command;
 use std::process::Stdio;
 use std::ffi::OsStr;
 use std::io::Read;
+use std::thread;
+
 
 pub fn ffmpeg(con: &Conversion) {
     let mut c = Command::new("ffmpeg");
@@ -11,7 +13,7 @@ pub fn ffmpeg(con: &Conversion) {
         OsStr::new("-f"),       OsStr::new("matroska"),
         OsStr::new("-c:v"),     OsStr::new("libx264"),
         OsStr::new("-level"),   OsStr::new("4.1"),
-        OsStr::new("-preset"),  OsStr::new("placebo"),
+        OsStr::new("-preset"),  OsStr::new("medium"),
         OsStr::new("-crf"),     OsStr::new("18"),
         OsStr::new("-c:a"),     OsStr::new("opus"),
         OsStr::new("-b:a"),     OsStr::new("192k"),
@@ -23,19 +25,14 @@ pub fn ffmpeg(con: &Conversion) {
     c.stdin(Stdio::null());
 
     let mut child = c.spawn().unwrap();
-    let mut s = String::new();
+    if let Some(mut stderr) = child.stderr {
+        child.stderr = Some(thread::spawn(move || {
+            let mut s = String::new();
+            let _bytes = stderr.read_to_string(&mut s);
+            println!("{}", s);
+            stderr
+        }).join().unwrap());
+    };
 
-
-    child.wait();
-    child.stderr.unwrap().read_to_string(&mut s);
-
-    println!("{}", s);
-
-    // let result = c.output().unwrap();
-    // let stdout = String::from_utf8(result.stdout).unwrap();
-    // let stderr = String::from_utf8(result.stderr).unwrap();
-    // let status = result.status.code().unwrap();
-
-    // println!("{}", stderr);
+    let _status = child.wait();
 }
-
