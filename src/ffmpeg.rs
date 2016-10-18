@@ -2,9 +2,8 @@ use conversion::Conversion;
 use std::process::Command;
 use std::process::Stdio;
 use std::ffi::OsStr;
-use std::io::Read;
 use std::thread;
-
+use regexreader::RegexReadIterator;
 
 pub fn ffmpeg(con: &Conversion) {
     let mut c = Command::new("ffmpeg");
@@ -27,9 +26,14 @@ pub fn ffmpeg(con: &Conversion) {
     let mut child = c.spawn().unwrap();
     if let Some(mut stderr) = child.stderr {
         child.stderr = Some(thread::spawn(move || {
-            let mut s = String::new();
-            let _bytes = stderr.read_to_string(&mut s);
-            println!("{}", s);
+            {
+                let matches = RegexReadIterator::new("time=[0-9:]+", &mut stderr);
+                if let Ok(matches) = matches {
+                    for m in matches {
+                        println!("{:?}", m)
+                    }
+                }
+            }
             stderr
         }).join().unwrap());
     };

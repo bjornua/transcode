@@ -1,3 +1,4 @@
+pub mod regexreader;
 pub mod ffprobe;
 pub mod time;
 pub mod source;
@@ -7,6 +8,8 @@ pub mod table;
 pub mod args;
 pub mod error;
 pub mod ffmpeg;
+extern crate rustc_serialize;
+extern crate regex;
 
 mod main {
     use source;
