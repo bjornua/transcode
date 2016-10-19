@@ -63,6 +63,7 @@ mod main {
         let (s_duration, s_fps) = conversions.into_iter().fold((0., 0.), |(a, b), c |
             (a + c.source.ffprobe.duration, b + c.source.ffprobe.mpixel())
         );
+
         fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
             Text(Right(Owned(pretty_centiseconds((n * 100.).round() as i64))))
         }
