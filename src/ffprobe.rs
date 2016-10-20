@@ -74,37 +74,40 @@ fn ffprobe_parse(text: String) -> Result<FFProbe, Error> {
         None => return Err(Error::new(JsonError{ input: text })),
     };
 
-    let streams = match json.find("streams").map(|j| j.as_array()) {
-        Some(Some(t)) => t,
-        _ => return Err(Error::new(StreamError{ input: text }))
+    let streams = match json.find("streams").and_then(|j| j.as_array()) {
+        Some(t) => t,
+        None => return Err(Error::new(StreamError{ input: text }))
     };
 
-    let video_stream = match streams.into_iter().filter(|&x| match x.find("codec_type").map(|x| x.as_string()) {
-        Some(Some("video")) => true,
-        _ => false
-    }).map(|x| x.as_object()).next() {
-        Some(Some(t)) => t,
-        _ => return Err(Error::new(VideoStreamError { input: text}))
+    let video_stream = match streams.into_iter()
+        .filter(|&x| x.find("codec_type").and_then(|x| x.as_string()) == Some("video"))
+        .filter_map(|x| x.as_object()).next() {
+        Some(t) => t,
+        None => return Err(Error::new(VideoStreamError { input: text}))
     };
 
-    let height = match video_stream.get("height").map(|x| x.as_u64()) {
-        Some(Some(t)) => t,
-        _ => return Err(Error::new(HeightError { input: text } ))
+    let height = match video_stream.get("height").and_then(|x| x.as_u64()) {
+        Some(t) => t,
+        None => return Err(Error::new(HeightError { input: text } ))
     };
 
-    let width = match video_stream.get("width").map(|x| x.as_u64()) {
-        Some(Some(t)) => t,
-        _ => return Err(Error::new(WidthError { input: text } ))
+    let width = match video_stream.get("width").and_then(|x| x.as_u64()) {
+        Some(t) => t,
+        None => return Err(Error::new(WidthError { input: text } ))
     };
 
-    let fps = match video_stream.get("avg_frame_rate").map(|x| x.as_string().map(|s| parse_fraction(&String::from(s)))) {
-        Some(Some(Some(t))) => t,
-        _ => return Err(Error::new(FPSError { input: text } ))
+    let fps: f64 = match video_stream.get("avg_frame_rate")
+        .and_then(|x| x.as_string())
+        .and_then(|s| parse_fraction(&String::from(s))) {
+        Some(t) => t,
+        None => return Err(Error::new(FPSError { input: text } ))
     };
 
-    let duration = match json.find_path(&["format", "duration"]).map(|j| j.as_string().map(|s| s.parse::<f64>())) {
-        Some(Some(Ok(t))) => t,
-        _ => return Err(Error::new(DurationError{ input: text }))
+    let duration: f64 = match json.find_path(&["format", "duration"])
+        .and_then(|j| j.as_string())
+        .and_then(|s| s.parse::<f64>().ok()) {
+        Some(t) => t,
+        None => return Err(Error::new(DurationError{ input: text }))
     };
 
     Ok(FFProbe {

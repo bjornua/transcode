@@ -8,7 +8,13 @@ pub struct Conversion {
     pub id: u64,
     pub source: Source,
     pub target: Target,
-    pub progress: f64
+    pub progress: f64,
+}
+
+impl Conversion {
+    pub fn get_progress(&self, time_processed: f64) -> f64 {
+        time_processed / self.source.ffprobe.duration
+    }
 }
 
 

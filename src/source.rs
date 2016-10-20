@@ -27,8 +27,7 @@ type Sources = Vec<Source>;
 pub fn get_many<'a, T, U>(paths: T) -> SourceResult<Sources> where T: IntoIterator<Item=U>, U: Into<PathBuf> {
     let paths = try!(
         paths.into_iter()
-        .map(|p| p.into() )
-        .map(|p| resolve_path(p))
+        .map(|p| resolve_path(p.into()))
         .collect::<Result<Vec<_>, _>>()
     );
 

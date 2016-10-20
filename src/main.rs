@@ -22,6 +22,14 @@ mod main {
         SourceError(source::Error)
     }
 
+    pub fn main_handle_errors() {
+        use error;
+        match main() {
+            Ok(()) => (),
+            Err(e) => { error::print_error(e); return }
+        }
+    }
+
     pub fn main() -> Result<(), ErrorKind> {
         use self::ErrorKind::{ArgError, SourceError};
 
@@ -34,22 +42,15 @@ mod main {
             Err(e) => { return Err(SourceError(e)) }
         };
 
-        let conversions = conversion::from_sources(sources);
+        let mut conversions = conversion::from_sources(sources);
 
         print_conversion(&conversions);
         println!("");
         // println!("{:#?}", conversions);
-        ffmpeg::ffmpeg(&conversions[0]);
+        convert(&mut conversions);
+        println!("{:#?}", ffmpeg::FFmpegIterator::new(&conversions[0]).unwrap().collect::<Vec<_>>());
 
         Ok(())
-    }
-
-    pub fn main_handle_errors() {
-        use error;
-        match main() {
-            Ok(()) => (),
-            Err(e) => { error::print_error(e); return }
-        }
     }
 
     fn print_conversion<'a>(conversions: &[conversion::Conversion]) {
@@ -80,6 +81,15 @@ mod main {
             Float(Owned(s_fps), 0)
         ]));
         print_table(vec!["ID", "Path", "Duration", "MPixel"], data);
+    }
+
+    fn convert(mut conversion: &mut [conversion::Conversion]) {
+        use std::time::{Duration, Instant};
+        let total_mpixel: f64 = conversion.into_iter().map(|c| c.source.ffprobe.mpixel()).sum();
+
+        let begin = Instant::now();
+
+
     }
 }
 
