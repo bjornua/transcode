@@ -56,7 +56,7 @@ impl FFmpegIterator {
             OsStr::new("-f"),       OsStr::new("matroska"),
             OsStr::new("-c:v"),     OsStr::new("libx264"),
             OsStr::new("-level"),   OsStr::new("4.1"),
-            OsStr::new("-preset"),  OsStr::new("medium"),
+            OsStr::new("-preset"),  OsStr::new("ultrafast"),
             OsStr::new("-crf"),     OsStr::new("18"),
             OsStr::new("-c:a"),     OsStr::new("opus"),
             OsStr::new("-b:a"),     OsStr::new("192k"),

@@ -7,8 +7,7 @@ use std::ffi::OsStr;
 pub struct Conversion {
     pub id: u64,
     pub source: Source,
-    pub target: Target,
-    pub progress: f64,
+    pub target: Target
 }
 
 impl Conversion {
@@ -22,7 +21,7 @@ pub fn from_sources(s: Vec<Source>) -> Vec<Conversion> {
     let paths: Vec<_> = (&s).into_iter().map(|s| (s.path.clone())).collect();
 
     unprefix_paths(paths.as_slice()).into_iter().zip(s).zip(0..)
-        .map(|((p, s), n)| Conversion { id: n, target: Target {path: p}, source: s, progress: 0. }
+        .map(|((p, s), n)| Conversion { id: n, target: Target {path: p}, source: s }
     ).collect()
 }
 

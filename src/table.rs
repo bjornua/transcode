@@ -2,6 +2,7 @@ use std::cmp;
 use std::borrow::Cow;
 use std::iter::repeat;
 use std::iter::once;
+use utils;
 
 #[derive(Debug)]
 #[derive(Clone)]
@@ -62,15 +63,11 @@ impl<'a> Alignment<'a> {
         };
 
         Cow::Owned([
-            Cow::Owned(repeat_str(" ", padding_left)),
+            Cow::Owned(utils::repeat_str(" ", padding_left)),
             text,
-            Cow::Owned(repeat_str(" ", padding_right))
+            Cow::Owned(utils::repeat_str(" ", padding_right))
         ].concat())
     }
-}
-
-fn repeat_str<T: AsRef<str>>(s: T, times: usize) -> String {
-    s.as_ref().chars().cycle().take(times).collect()
 }
 
 
@@ -125,11 +122,18 @@ fn make_table<'a, T: Table<'a>>(rows: T) -> Vec<Vec<Cow<'a, str>>> {
     ).collect()
 }
 
-pub fn print_table<'a, T: Table<'a>>(headers: Vec<&'a str>, rows: T) -> () {
-    let headers = headers.into_iter();
-    let headers: Vec<_> = headers.map(|c| Text(Left(Cow::Borrowed(c)))).collect();
-    let rows = once(headers).chain(rows);
-    for row in make_table(rows) {
+pub fn print_table<'a, T: Table<'a>>(headers: Option<Vec<&'a str>>, rows: T) -> () {
+    let rows = match headers {
+        None => {
+            make_table(rows)
+        }
+        Some(s) => {
+            let headers = s.into_iter();
+            let headers: Vec<_> = headers.map(|c| Text(Left(Cow::Borrowed(c)))).collect();
+            make_table(once(headers).chain(rows))
+        }
+    };
+    for row in rows {
         println!("{}", row.join(" | "))
     }
 }

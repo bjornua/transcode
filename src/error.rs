@@ -1,17 +1,16 @@
 use args;
 use ffprobe;
+use ffmpeg;
 use main;
 use source;
 
-
-
-
-pub fn print_error(k: main::ErrorKind) {
-    use main::ErrorKind::*;
+pub fn print_error(k: main::Error) {
+    use main::Error::*;
     println!("\n-------------------- Error --------------------");
     match k {
         ArgError(e) => print_arg_error(e),
-        SourceError(e) => print_source_error(e)
+        SourceError(e) => print_source_error(e),
+        FFmpegError(e) => print_ffmpeg_error(e)
     }
     println!("-----------------------------------------------");
 }
@@ -61,3 +60,8 @@ fn print_arg_error(args::Error {kind, msg}: args::Error) {
     }
 }
 
+use std::error::Error as std_error;
+
+fn print_ffmpeg_error(err: ffmpeg::Error) {
+    println!("Error: FFmpeg failure ({})", err.description());
+}
