@@ -24,7 +24,7 @@ pub struct Error {
     pub msg: String
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct FFProbe {
     pub width: u64,
     pub height: u64,

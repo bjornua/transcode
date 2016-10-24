@@ -1,4 +1,3 @@
-use conversion::Conversion;
 use std::process::{Command, Stdio, self};
 use std::ffi::OsStr;
 use regexreader::{RegexReadIterator};
@@ -48,11 +47,11 @@ pub struct FFmpegIterator {
 }
 
 impl FFmpegIterator {
-    pub fn new(con: &Conversion) -> Result<Self, Error> {
+    pub fn new(path: &OsStr) -> Result<Self, Error> {
         let mut c = Command::new("ffmpeg");
 
         c.args(&[
-            OsStr::new("-i"),       OsStr::new(&con.source.path),
+            OsStr::new("-i"),       OsStr::new(path),
             OsStr::new("-f"),       OsStr::new("matroska"),
             OsStr::new("-c:v"),     OsStr::new("libx264"),
             OsStr::new("-level"),   OsStr::new("4.1"),

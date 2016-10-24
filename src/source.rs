@@ -16,7 +16,7 @@ pub struct Error {
 type SourceResult<T> = Result<T, Error>;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Source {
     pub path: PathBuf,
     pub ffprobe: ffprobe::FFProbe

@@ -29,7 +29,7 @@ pub fn pretty_centiseconds(num: i64) -> String {
         if DSECONDS_DAYS <= num { Cow::Owned(format!("{}d ", days)) } else { Cow::Borrowed("") },
         if DSECONDS_HOURS <= num { Cow::Owned(format!("{:02}:", hours)) } else { Cow::Borrowed("") },
         if DSECONDS_MINUTES <= num { Cow::Owned(format!("{:02}:", minutes)) } else { Cow::Borrowed("") },
-        Cow::Owned(format!("{:02}.{:02}", seconds,  centisecond))
+        Cow::Owned(format!("{:02}.{:02}s", seconds,  centisecond))
     ].concat()
 
 }

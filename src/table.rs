@@ -122,7 +122,7 @@ fn make_table<'a, T: Table<'a>>(rows: T) -> Vec<Vec<Cow<'a, str>>> {
     ).collect()
 }
 
-pub fn print_table<'a, T: Table<'a>>(headers: Option<Vec<&'a str>>, rows: T) -> () {
+pub fn print_table<'a, T: Table<'a>>(headers: Option<Vec<&'a str>>, rows: T) -> usize {
     let rows = match headers {
         None => {
             make_table(rows)
@@ -133,7 +133,13 @@ pub fn print_table<'a, T: Table<'a>>(headers: Option<Vec<&'a str>>, rows: T) -> 
             make_table(once(headers).chain(rows))
         }
     };
+    let lines = rows.len();
     for row in rows {
-        println!("{}", row.join(" | "))
+        print!("{}", row.join(" | "));
+        print!("\n");
     }
+
+    use std::io::{stderr, Write};
+    let _ = stderr().flush();
+    lines
 }
