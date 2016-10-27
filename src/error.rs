@@ -53,7 +53,7 @@ fn print_arg_error(args::Error {kind, msg}: args::Error) {
         MissingProgramName => {
             ()
         },
-        MissingTargetDir { program_name } | MissingInputs { program_name } => {
+        /*MissingTargetDir { program_name } | */MissingInputs { program_name/*, target_directory: _ */} => {
             println!("");
             println!("Usage: {}", args::Args::usage(program_name))
         },

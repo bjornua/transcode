@@ -3,7 +3,6 @@
 #[derive(Debug)]
 pub enum ErrorKind {
     MissingProgramName,
-    MissingTargetDir { program_name: String },
     MissingInputs { program_name: String }
 }
 
@@ -21,16 +20,15 @@ impl From<ErrorKind> for Error {
 
         let msg = match kind {
             MissingProgramName => "Missing program name (argv[0])",
-            MissingTargetDir { .. } => "Missing target directory",
             MissingInputs { .. } => "No inputs specified"
         };
         Error{kind: kind, msg: msg.to_string()}
     }
 }
 
+#[derive(Debug)]
 pub struct Args {
     pub program_name: String,
-    pub target_directory: String,
     pub input: Vec<String>
 }
 
@@ -39,15 +37,15 @@ impl Args {
         use self::ErrorKind::*;
 
         let mut args = args.into_iter();
-        let program_name     = match args.next() { Some(s) => s, None => return Err(MissingProgramName.into()) };
-        let target_directory = match args.next() { Some(s) => s, None => return Err(MissingTargetDir { program_name: program_name }.into()) };
+        let program_name = match args.next() { Some(s) => s, None => return Err(MissingProgramName.into()) };
+        // let target_directory = match args.next() { Some(s) => s, None => return Err(MissingTargetDir { program_name: program_name }.into()) };
+
         let input: Vec<_> = args.collect();
         if input.len() == 0 {
             return Err(MissingInputs { program_name: program_name }.into())
         }
         Ok(Args {
             program_name: program_name,
-            target_directory: target_directory,
             input: input
         })
     }

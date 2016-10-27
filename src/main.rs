@@ -1,23 +1,33 @@
-pub mod regexreader;
-pub mod ffprobe;
-pub mod time;
-pub mod source;
-pub mod target;
-pub mod conversion;
-pub mod table;
 pub mod args;
+pub mod conversion;
 pub mod error;
 pub mod ffmpeg;
-pub mod utils;
+pub mod ffprobe;
+pub mod path;
 pub mod progress;
-extern crate rustc_serialize;
+pub mod regexreader;
+pub mod source;
+pub mod table;
+pub mod target;
+pub mod time;
+pub mod utils;
 extern crate regex;
+extern crate rustc_serialize;
 
 mod main {
-    use source;
-    use conversion;
-    use ffmpeg;
     use args::{self, Args};
+    use conversion::{Conversions, Conversion};
+    use error;
+    use ffmpeg;
+    use progress::Status;
+    use source;
+    use std::iter::once;
+    use std::path::PathBuf;
+    use table::Alignment::{Left, Right};
+    use table::Cell::{Text, Empty, self};
+    use table::print_table;
+    use time::pretty_centiseconds;
+    use utils::erase_up;
 
     pub enum Error {
         ArgError(args::Error),
@@ -41,31 +51,34 @@ mod main {
     }
 
     pub fn main_handle_errors() {
-        use error;
-        match main() {
-            Ok(()) => (),
-            Err(e) => { error::print_error(e); return }
+        if let Err(e) = main() {
+            error::print_error(e)
         }
     }
 
+    // pub fn new_main() {
+    //     use path::{RecursivePathIterator, PathType};
+
+    //     let count = RecursivePathIterator::new("/home/bjorn").take(1_000_000).fold(
+    //         (0, 0), |(a, b), x| match x {
+    //             PathType::Directory(_) => (a + 1, b    ),
+    //             PathType::File(_) =>      (a    , b + 1)
+    //     });
+    //     println!("{:?}", count);
+    // }
+
     pub fn main() -> Result<(), Error> {
         let args = try!(Args::from_env());
+        println!("{:#?}", args);
         let sources = try!(source::get_many(args.input));
-        let conversions = conversion::from_sources(sources);
+        let conversions = Conversions::from_sources(sources);
 
         try!(convert(conversions));
 
         Ok(())
     }
 
-
-    use progress::Status;
-    fn print_conversion<'a>(conversions: &[conversion::Conversion], status: &Status) -> usize {
-        use table::Alignment::{Left, Right};
-        use table::Cell::{Text, Empty, self};
-        use table::print_table;
-        use time::pretty_centiseconds;
-        use std::iter::once;
+    fn print_conversion<'a>(conversions: &Conversions, status: &Status) -> usize {
 
         fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
             Text(Right(pretty_centiseconds((n * 100.).round() as i64).into()))
@@ -77,7 +90,7 @@ mod main {
                 Status::Done(ref p) => seconds_to_cell(p.duration)
             }
         }
-        fn row<'a>(c: &'a conversion::Conversion) -> Vec<Cell<'a>> {
+        fn row<'a>(c: &'a Conversion) -> Vec<Cell<'a>> {
             vec![
                 Text(Left(c.target.path.to_string_lossy())),
                 Text(Left((&c.status).into())),
@@ -95,15 +108,12 @@ mod main {
         print_table(Some(vec!["Path", "Status", "Eta", ""]), data_sum)
     }
 
-    fn convert(mut conversions: Vec<conversion::Conversion>) -> Result<(), (ffmpeg::Error)> {
-        use progress::{Status};
-        use utils::erase_up;
+    fn convert(mut conversions: Conversions) -> Result<(), (ffmpeg::Error)> {
         let global_mpixel: f64 = (&conversions).into_iter().map(|c| c.source.ffprobe.mpixel()).sum();
         let mut global_status = Status::new(global_mpixel);
         let mut global_progress = 0.;
         let mut lines = print_conversion(&conversions, &global_status);
 
-        use std::path::PathBuf;
 
         global_status.start();
         for n in 0..conversions.len() {
@@ -134,13 +144,12 @@ mod main {
         global_status.end();
 
         erase_up(lines);
-        drop(lines);
-        let _ = print_conversion(&conversions, &global_status);
+        print_conversion(&conversions, &global_status);
+
         print!("\n");
         Ok(())
     }
 }
-
 
 
 fn main() {

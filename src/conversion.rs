@@ -1,13 +1,15 @@
-use source::Source;
-use target::Target;
-use std::path::PathBuf;
-use std::ffi::OsStr;
 use progress::Status;
+use source::{Sources, Source};
+use std::ffi::OsStr;
+use std::iter::once;
+use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
+use target::Target;
 
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
-    pub id: u64,
+    id: u64,
     pub source: Source,
     pub target: Target,
     pub status: Status
@@ -19,56 +21,63 @@ impl Conversion {
         let target = Target {path: path};
         Conversion { id: id, target: target, source: source, status: status }
     }
-    pub fn get_progress(&self, time_processed: f64) -> f64 {
-        time_processed / self.source.ffprobe.duration
-    }
+}
 
+pub struct Conversions(Vec<Conversion>);
+
+impl Conversions {
+    pub fn from_sources(s: Sources) -> Conversions {
+        let paths: Vec<_> = s.iter().map(|s| (s.path.clone())).collect();
+
+        Conversions(
+            reprefix_paths(&paths, OsStr::new("")).into_iter().zip(s).zip(0..).map(
+            |((path, source), id)| Conversion::new(id, path, source)
+        ).collect())
+    }
+}
+impl Deref for Conversions {
+    type Target = [Conversion];
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+impl DerefMut for Conversions {
+    // type Target = [Conversion];
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
 
-pub fn from_sources(s: Vec<Source>) -> Vec<Conversion> {
-    let paths: Vec<_> = (&s).into_iter().map(|s| (s.path.clone())).collect();
-
-    unprefix_paths(&paths).into_iter().zip(s).zip(0..)
-        .map(|((path, source), id)| Conversion::new(id, path, source)
-    ).collect()
-}
-
-
-fn unprefix_paths(p: &[PathBuf]) -> Vec<PathBuf> {
-    fn unprefix(p: &PathBuf, count: usize) -> PathBuf {
-        p.into_iter().skip(count).collect::<PathBuf>()
-    }
-    pub fn get_longest_prefix(s: &[PathBuf]) -> usize {
-        fn pathbuf_to_osstr<'a>(p: &'a PathBuf) -> Vec<&'a OsStr> {
-            p.into_iter().collect::<Vec<_>>()
-        }
-        fn common_prefix<'a>(a: &'a [&'a OsStr], b: &[&OsStr]) -> &'a [&'a OsStr] {
-            let count = a.into_iter().zip(b.into_iter()).take_while(|&(ref a, ref b)| a == b).count();
-
-            return &a[0..count]
-        }
-        fn get_prefix<'a>(s: &'a [&'a OsStr]) -> &'a [&'a OsStr] {
-            match s.split_last() {
-                Some((_, s)) => s,
-                None => s
-            }
-        }
-
-        let ss: Vec<Vec<&OsStr>> = s.into_iter().map(pathbuf_to_osstr).collect();
-
-        let mut s = (&ss).into_iter().map(|ref x| get_prefix((x)));
-        let longest = match s.next() {
-            Some(s) => s,
-            None => return 0
-        };
-
-        let longest = s.fold(longest, |longest, ref new| common_prefix(longest, new));
-
-        longest.len()
-    }
-
+fn reprefix_paths(p: &[PathBuf], new_prefix: &OsStr) -> Vec<PathBuf> {
     let longest_prefix: usize = get_longest_prefix(&p);
+    p.into_iter().map(|x| reprefix(x, new_prefix, longest_prefix)).collect()
 
-    p.into_iter().map(|x| unprefix(x, longest_prefix)).collect()
+}
+fn reprefix(p: &PathBuf, new_prefix: &OsStr, count: usize) -> PathBuf {
+    let unprefixed = p.into_iter().skip(count);
+    once(new_prefix).chain(unprefixed).collect::<PathBuf>()
+}
+
+fn get_longest_prefix<'a>(paths: &'a [PathBuf]) -> usize {
+    let components: Vec<_> = paths.into_iter().map(|p| {
+        let mut p: Vec<_> = p.into_iter().collect();
+        p.pop();
+        p
+    }).collect();
+
+    let mut iter = components.iter();
+
+    let longest = match iter.next() {
+        Some(s) => s.as_slice(),
+        None => return 0
+    };
+
+    let longest = iter.fold(longest, |longest, new| common_prefix(longest, new));
+
+    longest.len()
+}
+
+fn common_prefix<'a, T: PartialEq>(a: &'a[T], b: &[T]) -> &'a[T] {
+    let common = a.into_iter().zip(b.into_iter()).take_while(
+        |&(a, b)| a == b
+    );
+
+    return &a[0..common.count()]
 }

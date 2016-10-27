@@ -3,6 +3,8 @@ name = "transcode"
 version = "0.0.1"
 authors = [ "Bjørn Uhre Arnholtz <rugkiks@gmail.com>" ]
 
+[profile.dev]
+debug = true
 
 [dependencies]
 rustc-serialize = "0.3.19"

@@ -22,7 +22,25 @@ pub struct Source {
     pub ffprobe: ffprobe::FFProbe
 }
 
-type Sources = Vec<Source>;
+pub struct Sources(Vec<Source>);
+
+impl IntoIterator for Sources {
+    type Item = Source;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+use std::ops::{Deref, DerefMut};
+impl Deref for Sources {
+    type Target = [Source];
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+impl DerefMut for Sources {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
 
 pub fn get_many<'a, T, U>(paths: T) -> SourceResult<Sources> where T: IntoIterator<Item=U>, U: Into<PathBuf> {
     let paths = try!(
@@ -42,7 +60,7 @@ pub fn get_many<'a, T, U>(paths: T) -> SourceResult<Sources> where T: IntoIterat
         .zip(ffprobes)
         .map(|(s,f)| Source { path: s, ffprobe: f } );
 
-    Ok(sources.collect())
+    Ok(Sources(sources.collect()))
 }
 
 fn resolve_path(path: PathBuf) -> SourceResult<PathBuf> {

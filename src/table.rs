@@ -4,8 +4,7 @@ use std::iter::repeat;
 use std::iter::once;
 use utils;
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Alignment<'a> {
     Left(Cow<'a, str>),
     Right(Cow<'a, str>),
