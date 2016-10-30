@@ -51,6 +51,7 @@ mod main {
         let (sources, bads) = Sources::from_paths(args.input);
 
         let conversions = Conversions::from_sources(sources);
+        conversions.print_table();
 
         if bads.len() > 0 {
             print_bads(bads.as_slice());
@@ -74,10 +75,7 @@ mod main {
     }
 
     fn convert(mut conversions: Conversions) -> Result<(), (ffmpeg::Error)> {
-        let mut global_progress = 0.;
-        let mut lines = conversions.print_table(&global_status);
-
-        global_status.start();
+        let mut lines = 0;
         for n in 0..conversions.len() {
 
             // Okay, hope this scope thing is going to be better in the future :)
@@ -92,23 +90,19 @@ mod main {
                     let ref mut c = conversions[n];
                     let local_progress = time / c.source.ffprobe.duration * local_mpixel;
                     c.status.update(local_progress);
-                    global_status.update(global_progress + local_progress);
                 }
                 erase_up(lines);
-                lines = conversions.print_table(&global_status);
+                lines = conversions.print_table();
             }
-            global_progress += local_mpixel;
             {
                 let ref mut c = conversions[n];
                 c.status.end();
             };
             erase_up(lines);
-            lines = conversions.print_table(&global_status);
+            lines = conversions.print_table();
         }
-        global_status.end();
-
         erase_up(lines);
-        conversions.print_table(&global_status);
+        conversions.print_table();
 
         print!("\n");
         Ok(())

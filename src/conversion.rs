@@ -1,4 +1,4 @@
-use progress::Status;
+use progress::{Status, status_sum};
 use source::{Sources, Source};
 use std::ffi::OsStr;
 use std::ops::{Deref, DerefMut};
@@ -65,10 +65,9 @@ impl Conversions {
         let global_mpixel: f64 = (&conversions).into_iter().map(
             |c| c.source.ffprobe.mpixel()
         ).sum();
-
         Conversions(conversions, Status::new(global_mpixel))
     }
-    pub fn print_table(&self, status: &Status) -> usize {
+    pub fn print_table(&self) -> usize {
         use table::print_table;
         use table::Cell::{self, Text, Empty};
         use table::Alignment::{Left, Right};
@@ -99,14 +98,23 @@ impl Conversions {
                 eta(&c.status),
             ]
         }
-        let conversions = self.into_iter().map(row).chain(once(vec![]));
-        let sums = once(vec![
-            Text(Left("Total".into())),
-            Text(Left(status.into())),
-            eta(status),
-        ]);
 
-        let data = conversions.chain(once(vec![])).chain(sums);
+
+
+        let conversions = self.into_iter().map(row).chain(once(vec![]));
+
+        let global_status: Option<Status> = status_sum(self.into_iter().map(|&Conversion { ref status, ..}| status));
+
+        let sums = match global_status {
+            Some(ref global_status) => vec![vec![], vec![
+                Text(Left("Total".into())),
+                Text(Left(global_status.into())),
+                eta(global_status)
+            ]],
+            None => vec![]
+        };
+
+        let data = conversions.chain(sums);
 
         print_table(Some(vec!["Path", "Status", "Eta", ""]), data)
     }

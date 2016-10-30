@@ -1,19 +1,20 @@
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
-pub struct Progress {
-    target: f64,
-    begin: Instant,
-    processed: f64
-}
-
-#[derive(Debug, Clone)]
 pub struct Pending {
     target: f64
 }
 
 #[derive(Debug, Clone)]
+pub struct Progress {
+    begin: Instant,
+    target: f64,
+    processed: f64
+}
+
+#[derive(Debug, Clone)]
 pub struct Done {
+    pub begin: Instant,
     pub duration: f64,
     target: f64
 }
@@ -52,6 +53,7 @@ impl Progress {
     }
     pub fn end(&self) -> Done {
         Done {
+            begin: self.begin,
             duration: (self.elapsed_ns() as f64) / 1_000_000_000.,
             target: self.target
         }
@@ -101,6 +103,20 @@ impl Status {
             s.update(progress)
         }
     }
+    pub fn get_progress(&self) -> f64 {
+        match *self {
+            Status::Progress(Progress { processed, ..} ) => processed,
+            Status::Done(Done { target, ..} ) => target,
+            Status::Pending(_) => 0.,
+        }
+    }
+    pub fn get_target(&self) -> f64 {
+        match *self {
+            Status::Progress(Progress { target, ..} ) => target,
+            Status::Done(Done { target, ..} ) => target,
+            Status::Pending(Pending {target, ..}) => target,
+        }
+    }
     pub fn end(&mut self) {
         *self = if let &mut Status::Progress(ref s) = self {
             s.end().into()
@@ -131,12 +147,66 @@ impl Status {
 }
 use std::borrow::Cow::{self, Borrowed, Owned};
 
+pub fn status_sum<'a, T: IntoIterator<Item=&'a Status>>(statuses: T) -> Option<Status> {
+    use std::cmp::min;
+    let mut statuses = statuses.into_iter();
+
+    let mut global_status = match statuses.next() {
+        Some(s) => s.clone(),
+        None => return None
+    };
+
+    for status in statuses {
+        global_status = match (global_status, status) {
+            (Status::Pending(ref g), &Status::Pending(ref s)) => {
+                Pending { target: s.target +  g.target}.into()
+            },
+            (Status::Pending(ref g), &Status::Progress(ref s)) => {
+                Progress { target: s.target + g.target, processed: s.processed, begin: s.begin}.into()
+            },
+            (Status::Pending(ref g), &Status::Done(ref s)) => {
+                Progress { target: s.target + g.target, processed: s.target, begin: s.begin}.into()
+            },
+            (Status::Progress(ref g), &Status::Pending(ref s)) => {
+                Progress { target: s.target + g.target, processed: g.processed, begin: g.begin}.into()
+            },
+            (Status::Progress(ref g), &Status::Progress(ref s)) => {
+                Progress { target: s.target + g.target, processed: g.processed + s.processed, begin: min(s.begin, g.begin)}.into()
+            },
+            (Status::Progress(ref g), &Status::Done(ref s)) => {
+                Progress { target: s.target + g.target, processed: g.processed + s.target, begin: min(s.begin, g.begin)}.into()
+            },
+            (Status::Done(ref g), &Status::Pending(ref s)) => {
+                Progress { target: s.target + g.target, processed: g.target, begin: g.begin}.into()
+            },
+            (Status::Done(ref g), &Status::Progress(ref s)) => {
+                Progress { target: s.target + g.target, processed: g.target, begin: min(s.begin, g.begin)}.into()
+            },
+            (Status::Done(ref g), &Status::Done(ref s)) => {
+                Done { target: s.target + g.target, duration: g.duration + s.duration, begin: min(s.begin, g.begin)}.into()
+            },
+        }
+
+    }
+    Some(global_status)
+}
+
+
 impl<'a> From<&'a Status> for Cow<'a, str> {
     fn from(s: &'a Status) -> Self {
         match *s {
             Status::Pending(_) => Borrowed("       "),
             Status::Done(_) => Borrowed("Done"),
             Status::Progress(ref s) => Owned(format!("{:6.2}%", s.percentage()))
+        }
+    }
+}
+impl<'a> From<Status> for Cow<'a, str> {
+    fn from(s: Status) -> Self {
+        match s {
+            Status::Pending(_) => Borrowed("       "),
+            Status::Done(_) => Borrowed("Done"),
+            Status::Progress(s) => Owned(format!("{:6.2}%", s.percentage()))
         }
     }
 }
