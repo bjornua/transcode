@@ -42,7 +42,7 @@ impl Conversion {
 }
 
 #[derive(Debug)]
-pub struct Conversions(Vec<Conversion>);
+pub struct Conversions(Vec<Conversion>, Status);
 
 impl Conversions {
     pub fn from_sources(s: Sources) -> Conversions {
@@ -58,11 +58,59 @@ impl Conversions {
             (base_path_len, base_path.into_iter().collect())
         };
 
-        let conversions = (paths).into_iter().zip(s).zip(0..).map(
+        let conversions: Vec<_> = (paths).into_iter().zip(s).zip(0..).map(
             |((path, source), id)| Conversion::new(id, reprefix(&path, &base_path_new, base_path_len), source)
-        );
-        Conversions(conversions.collect())
+        ).collect();
+
+        let global_mpixel: f64 = (&conversions).into_iter().map(
+            |c| c.source.ffprobe.mpixel()
+        ).sum();
+
+        Conversions(conversions, Status::new(global_mpixel))
     }
+    pub fn print_table(&self, status: &Status) -> usize {
+        use table::print_table;
+        use table::Cell::{self, Text, Empty};
+        use table::Alignment::{Left, Right};
+        use time::pretty_centiseconds;
+        use std::borrow::Cow;
+        use strings::truncate_left;
+        use std::iter::once;
+        fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
+            Text(Right(pretty_centiseconds((n * 100.).round() as i64).into()))
+        }
+        fn eta<'a>(s: &Status) -> Cell<'a> {
+            match *s {
+                Status::Pending(_) => Empty,
+                Status::Progress(ref p) => { p.eta().map_or(Empty, seconds_to_cell) },
+                Status::Done(ref p) => seconds_to_cell(p.duration)
+            }
+        }
+
+        fn row<'a>(c: &'a Conversion) -> Vec<Cell<'a>> {
+            let paths: Cow<'a, str> = match ::path::find_relative_cwd(c.target.path.as_path()) {
+                Ok(p) => Cow::Owned(p.to_string_lossy().into_owned()),
+                Err(_) => { c.target.path.to_string_lossy() }
+            };
+
+            vec![
+                Text(Left(truncate_left(paths, "...", 60))),
+                Text(Left((&c.status).into())),
+                eta(&c.status),
+            ]
+        }
+        let conversions = self.into_iter().map(row).chain(once(vec![]));
+        let sums = once(vec![
+            Text(Left("Total".into())),
+            Text(Left(status.into())),
+            eta(status),
+        ]);
+
+        let data = conversions.chain(once(vec![])).chain(sums);
+
+        print_table(Some(vec!["Path", "Status", "Eta", ""]), data)
+    }
+
 }
 
 impl Deref for Conversions {
