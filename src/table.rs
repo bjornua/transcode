@@ -36,9 +36,9 @@ impl<'a> Alignment<'a> {
     fn len(&self) -> usize {
         match *self {
             Alignment::Empty => 0,
-            Left(ref t) => t.len(),
-            Right(ref t) => t.len(),
-            Center(ref t) => t.len()
+            Left(ref t) => t.chars().count(),
+            Right(ref t) => t.chars().count(),
+            Center(ref t) => t.chars().count()
         }
     }
 

@@ -1,5 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::env::current_dir;
+use std::ffi::OsStr;
 use std::fs::{ReadDir};
+use std::io;
+use std::path::{Path, PathBuf};
+use utils::common_prefix;
+
 #[derive(Debug)]
 pub enum PathType {
     Directory(PathBuf),
@@ -74,4 +79,20 @@ impl Iterator for RecursivePathIterator {
             });
         }
     }
+}
+
+pub fn find_relative(a: &Path, b: &Path) -> PathBuf {
+    let a: Vec<_> = a.iter().collect();
+    let b: Vec<_> = b.iter().collect();
+
+    let common = common_prefix(a.as_slice(), b.as_slice()).len();
+
+    let dots = b[common..].into_iter().map(|_| OsStr::new(".."));
+    let path = a[common..].into_iter().map(|&x| x);
+
+    dots.chain(path).collect()
+}
+
+pub fn find_relative_cwd<'a>(a: &'a Path) -> Result<PathBuf, io::Error> {
+    Ok(find_relative(a, try!(current_dir()).as_ref()))
 }

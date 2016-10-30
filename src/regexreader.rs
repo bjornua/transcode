@@ -4,7 +4,7 @@ use std::str::{self};
 
 pub struct RegexReadIterator<T: Read> {
     regex: Regex,
-    buffer: Vec<u8>,
+    pub buffer: Vec<u8>,
     cursor: usize,
     reader: T,
     closed: bool
