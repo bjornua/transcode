@@ -74,11 +74,6 @@ mod main {
     }
 
     fn convert(mut conversions: Conversions) -> Result<(), (ffmpeg::Error)> {
-        let global_mpixel: f64 = (&conversions).into_iter().map(
-            |c| c.source.ffprobe.mpixel()
-        ).sum();
-
-        let mut global_status = Status::new(global_mpixel);
         let mut global_progress = 0.;
         let mut lines = conversions.print_table(&global_status);
 
