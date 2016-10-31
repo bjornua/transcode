@@ -1,51 +1,40 @@
 use args;
 use ffmpeg;
-// use ffprobe;
-use main;
-// use source;
+use conversion;
 use std::error::Error as StdError;
 
-pub fn print_error(k: main::Error) {
-    use main::Error::*;
+pub enum Error {
+    ArgError(args::Error),
+    FFmpegError(ffmpeg::Error),
+    ConversionError(conversion::Error)
+}
+impl From<ffmpeg::Error> for Error {
+    fn from(err: ffmpeg::Error) -> Self {
+        Error::FFmpegError(err)
+    }
+}
+impl From<args::Error> for Error {
+    fn from(err: args::Error) -> Self {
+        Error::ArgError(err)
+    }
+}
+impl From<conversion::Error> for Error {
+    fn from(err: conversion::Error) -> Self {
+        Error::ConversionError(err)
+    }
+}
+
+pub fn print_error(k: Error) {
+    use self::Error::*;
     println!("\n-------------------- Error --------------------");
     match k {
         ArgError(e) => print_arg_error(e),
-        // SourceError(e) => print_source_error(e),
+        ConversionError(e) => print_conversion_error(e),
         FFmpegError(e) => print_ffmpeg_error(e)
     }
     println!("-----------------------------------------------");
 }
 
-
-// fn print_source_error(kind: source::Error) {
-//     use source::Error::*;
-//     match kind {
-//         FFProbeError {error: e, ..} => print_ffprobe_error(e),
-//         PathError { error: e, .. } => {
-//             println!("Error: Path failed ({})", e.description());
-//         }
-//     };
-// }
-
-
-// fn print_ffprobe_error(kind: ffprobe::Error) {
-//     use ffprobe::Error::*;
-//     println!("Error: ffprobe failed ({})", kind.description());
-//     match kind {
-//         RunError { output } => {
-//             println!("ffprobe output:\n\n{}\n", output)
-//         },
-//         JsonError { .. } => (),
-//         DurationError { .. } => (),
-//         StreamError { .. } => (),
-//         HeightError { .. } => (),
-//         WidthError { .. } => (),
-//         FPSError { .. } => (),
-//         VideoCodecNameError { .. } => (),
-//         AudioCodecNameError { .. } => (),
-//     }
-
-// }
 
 fn print_arg_error(kind: args::Error) {
     use args::Error::*;
@@ -54,7 +43,7 @@ fn print_arg_error(kind: args::Error) {
         MissingProgramName => {
             ()
         },
-        /*MissingTargetDir { program_name } | */MissingInputs { program_name/*, target_directory: _ */} => {
+        MissingInputs { program_name } => {
             println!("");
             println!("Usage: {}", args::Args::usage(program_name))
         },
@@ -70,4 +59,9 @@ fn print_ffmpeg_error(err: ffmpeg::Error) {
         ffmpeg::Error::IO(_) => (),
         ffmpeg::Error::NoStderr => ()
     }
+}
+
+fn print_conversion_error(err: conversion::Error) {
+    println!("Conversion error");
+    println!("{}", err);
 }

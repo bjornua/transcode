@@ -19,19 +19,30 @@ pub struct Conversion {
 }
 
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+    TargetDirExists { target_dir: PathBuf }
+}
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
+            Error::TargetDirExists { .. } => "Target directory exists"
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
+            Error::TargetDirExists { .. } => None
         }
     }
 }
-impl fmt::Display for Error { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.description()) } }
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::TargetDirExists {ref target_dir} => write!(f, "{}: {}", self.description(), target_dir.to_string_lossy())
+        }
+
+    }
+}
 
 
 
@@ -47,11 +58,11 @@ impl Conversion {
 pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
-    pub fn from_sources(s: Sources) -> Conversions {
+    pub fn from_sources(s: Sources) -> Result<Conversions, Error> {
         let paths: Vec<_> = s.iter().map(|s| s.path.clone()).collect();
 
         use std::ffi::OsString;
-        let (base_path_len, base_path_new): (usize, PathBuf) = {
+        let (base_path_len, target_dir): (usize, PathBuf) = {
             let mut base_path: Vec<OsString> = get_longest_prefix(&paths).into_iter().map(|x| x.to_os_string()).collect();
             let base_path_len = base_path.len();
             let mut folder_name = base_path.pop().unwrap().to_os_string();
@@ -60,11 +71,15 @@ impl Conversions {
             (base_path_len, base_path.into_iter().collect())
         };
 
+        if target_dir.exists() {
+            return Err(Error::TargetDirExists {target_dir: target_dir})
+        }
+
         let conversions: Vec<_> = (paths).into_iter().zip(s).zip(0..).map(
-            |((path, source), id)| Conversion::new(id, reprefix(&path, &base_path_new, base_path_len), source)
+            |((path, source), id)| Conversion::new(id, reprefix(&path, &target_dir, base_path_len), source)
         ).collect();
 
-        Conversions(conversions)
+        Ok(Conversions(conversions))
     }
     pub fn print_table(&self) -> usize {
         use table::print_table;
@@ -156,11 +171,6 @@ impl DerefMut for Conversions {
     fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
-// fn reprefix_paths(p: &[PathBuf], new_prefix: &OsStr) -> Vec<PathBuf> {
-//     let longest_prefix: usize = get_longest_prefix(&p);
-//     p.into_iter().map(|x| reprefix(x, new_prefix, longest_prefix)).collect()
-
-// }
 fn reprefix(p: &PathBuf, new_prefix: &PathBuf, count: usize) -> PathBuf {
     let unprefixed: PathBuf = p.into_iter().skip(count).collect();
     new_prefix.join(unprefixed)

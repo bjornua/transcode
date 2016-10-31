@@ -179,7 +179,7 @@ pub fn status_sum<'a, T: IntoIterator<Item=&'a Status>>(statuses: T) -> Option<S
                 Progress { target: s.target + g.target, processed: g.target, begin: g.begin}.into()
             },
             (Status::Done(ref g), &Status::Progress(ref s)) => {
-                Progress { target: s.target + g.target, processed: g.target, begin: min(s.begin, g.begin)}.into()
+                Progress { target: s.target + g.target, processed: g.target + s.processed, begin: min(s.begin, g.begin)}.into()
             },
             (Status::Done(ref g), &Status::Done(ref s)) => {
                 Done { target: s.target + g.target, duration: g.duration + s.duration, begin: min(s.begin, g.begin)}.into()

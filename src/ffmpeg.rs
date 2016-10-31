@@ -6,6 +6,7 @@ use std::fmt;
 use std::io::{Read, self};
 use std::process::{Command, Stdio, self};
 use std::str::{self};
+use path;
 
 #[derive(Debug)]
 pub enum Error {
@@ -36,6 +37,13 @@ impl fmt::Display for Error {
         write!(f, "{}", self.description())
     }
 }
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::IO(err)
+    }
+}
+
 
 pub struct FFmpegIterator {
     process: process::Child,
@@ -71,7 +79,7 @@ impl FFmpegIterator {
             OsStr::new("-c:a"),     OsStr::new("opus"),
             OsStr::new("-b:a"),     OsStr::new("192k"),
             OsStr::new("-y"),
-            OsStr::new("/dev/null") // con.target.path
+            con.target.path.as_ref()
         ]);
         // println!("{}", args.iter().map(|x| format!("{:?}", x.to_string_lossy())).collect::<Vec<_>>().join(" "));
         // panic!();
@@ -80,6 +88,8 @@ impl FFmpegIterator {
         c.stderr(Stdio::piped());
         c.stdout(Stdio::piped());
         c.stdin(Stdio::null());
+
+        try!(path::mkdir_parent(&con.target.path));
 
         let mut child = c.spawn().unwrap();
         let stderr = child.stderr.take();

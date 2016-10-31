@@ -1,6 +1,6 @@
 use std::env::current_dir;
 use std::ffi::OsStr;
-use std::fs::{ReadDir};
+use std::fs::{ReadDir, create_dir_all};
 use std::io;
 use std::path::{Path, PathBuf};
 use utils::common_prefix;
@@ -96,3 +96,12 @@ pub fn find_relative(a: &Path, b: &Path) -> PathBuf {
 pub fn find_relative_cwd<'a>(a: &'a Path) -> Result<PathBuf, io::Error> {
     Ok(find_relative(a, try!(current_dir()).as_ref()))
 }
+
+pub fn mkdir_parent(path: &Path) -> io::Result<()>  {
+    let parent = match path.parent() {
+        Some(p) => p,
+        None => return Ok(())
+    };
+    create_dir_all(parent)
+}
+

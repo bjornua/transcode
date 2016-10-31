@@ -18,8 +18,6 @@ impl StdError for Error {
 }
 impl fmt::Display for Error { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.description()) } }
 
-
-
 #[derive(Debug)]
 pub struct Args {
     pub program_name: String,
