@@ -22,6 +22,9 @@ Currently the only target format is hardcoded and is:
 |-----------|-----------|-----------|
 |MKV        | Opus 192k | h.264 4.1 |
 
+## Requirements
+
+
 ## Motivation
 I ran into the problem of having many video files of various formats that needed to run on a raspberry pi.
 So i needed a script to convert all of them for playback in a format that raspberry pi can run.
