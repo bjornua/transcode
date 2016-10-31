@@ -47,3 +47,10 @@ pub fn prompt<F: Fn(&str) -> bool>(question: &str, validator: F) -> Option<Strin
     }
     None
 }
+
+pub fn prompt_continue() -> bool {
+    prompt(
+        "Do you want to continue [y/n]?",
+        |s| s == "y" || s == "n"
+    ).map_or(false, |s| s == "y")
+}

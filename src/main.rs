@@ -22,7 +22,7 @@ mod main {
     use ffmpeg;
     use path;
     use source::{Source, Sources, self};
-    use utils::{prompt};
+    use utils::{prompt_continue};
 
     pub enum Error {
         ArgError(args::Error),
@@ -56,13 +56,8 @@ mod main {
         }
 
         print_sources(&sources);
-        println!("");
-        let cont = prompt(
-            "Do you want to continue [y/n]?",
-            |x| x == "y" || x == "n"
-        ).map_or(false, |x| x == "y");
 
-        if cont {
+        if prompt_continue() {
             println!("");
             let conversions = Conversions::from_sources(sources);
             try!(conversions.convert());
