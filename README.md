@@ -26,7 +26,9 @@ Currently the only target format is hardcoded and is:
 
 ## Installation
 * Install rust (https://www.rust-lang.org/en-US/downloads.html)
+* Install ffmpeg (https://ffmpeg.org/download.html)
 * Run `cargo install transcode`
+* Run `~/.cargo/bin/transcode`
 
 ## Motivation
 I ran into the problem of having many video files of various formats that needed to run on a raspberry pi.
