@@ -1,3 +1,6 @@
+use std::cmp::{max, min};
+use utils;
+use std::borrow::Cow::{self, Borrowed, Owned};
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
@@ -92,14 +95,15 @@ impl Status {
         Status::Pending(Pending {target: target})
     }
     pub fn start(&mut self) {
-        *self = if let &mut Status::Pending(ref s) = self {
+        *self = if let Status::Pending(ref s) = *self {
             s.start().into()
         } else {
             return
         }
     }
     pub fn update(&mut self, progress: f64) {
-        if let &mut Status::Progress(ref mut s) = self {
+        self.start();
+        if let Status::Progress(ref mut s) = *self {
             s.update(progress)
         }
     }
@@ -125,9 +129,6 @@ impl Status {
         }
     }
     pub fn bar(&self, width: usize) -> String {
-        use std::cmp::{max, min};
-        use std::borrow::Cow::{Owned, Borrowed};
-        use utils;
 
         let width = width - 0;
         let bars = match *self {
@@ -145,10 +146,8 @@ impl Status {
         ].concat()
     }
 }
-use std::borrow::Cow::{self, Borrowed, Owned};
 
 pub fn status_sum<'a, T: IntoIterator<Item=&'a Status>>(statuses: T) -> Option<Status> {
-    use std::cmp::min;
     let mut statuses = statuses.into_iter();
 
     let mut global_status = match statuses.next() {

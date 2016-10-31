@@ -21,9 +21,8 @@ mod main {
     use error;
     use ffmpeg;
     use path;
-    use progress::Status;
-    use source::{Sources, self};
-    use utils::{erase_up};
+    use source::{Source, Sources, self};
+    use utils::{erase_up, prompt};
 
     pub enum Error {
         ArgError(args::Error),
@@ -50,18 +49,28 @@ mod main {
         let args = try!(Args::from_env());
         let (sources, bads) = Sources::from_paths(args.input);
 
-        let conversions = Conversions::from_sources(sources);
-        conversions.print_table();
 
         if bads.len() > 0 {
             print_bads(bads.as_slice());
+            println!("");
         }
-        try!(convert(conversions));
+
+        print_sources(&sources);
+        println!("");
+        let cont = prompt("Do you want to continue [y/n]?", |x| x == "y" || x == "n").map_or(false, |x| x == "y");
+        println!("");
+
+
+        if cont {
+            let conversions = Conversions::from_sources(sources);
+            try!(convert(conversions));
+        }
 
         Ok(())
     }
 
     fn print_bads(bads: &[source::Error]) {
+        println!("Skipping:");
         for error in bads {
             let path = match *error {
                 source::Error::FFProbeError { ref path,.. }
@@ -69,9 +78,14 @@ mod main {
                     path::find_relative_cwd(path).ok()
                 }
             };
-            print!("Skipping: {}\n", path.as_ref().map(|p| p.to_string_lossy()).unwrap_or("".into()));
+            println!("    {}", path.as_ref().map(|p| p.to_string_lossy()).unwrap_or("".into()));
         }
-        println!("");
+    }
+    fn print_sources(sources: &Sources) {
+        println!("Converting: ");
+        for &Source { ref path, ..} in sources.iter() {
+            println!("    {}", path.to_string_lossy());
+        }
     }
 
     fn convert(mut conversions: Conversions) -> Result<(), (ffmpeg::Error)> {
@@ -81,7 +95,6 @@ mod main {
             // Okay, hope this scope thing is going to be better in the future :)
             let (local_mpixel, ffmpeg_con): (f64, conversion::Conversion) = {
                 let ref mut c = conversions[n];
-                c.status.start();
                 (c.source.ffprobe.mpixel(), c.clone())
             };
             for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con)) {

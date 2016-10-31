@@ -27,3 +27,25 @@ pub fn common_prefix<'a, T: PartialEq>(a: &'a[T], b: &[T]) -> &'a[T] {
 
     return &a[0..common.count()]
 }
+
+
+pub fn prompt<F: Fn(&str) -> bool>(question: &str, validator: F) -> Option<String> {
+    use std::io::{self, Write, BufRead, BufReader};
+    let mut lines = BufReader::new(io::stdin()).lines();
+
+    loop {
+        print!("{}: ", question);
+        let _ = io::stdout().flush();
+        match lines.next().and_then(|x| x.ok()) {
+            Some(line) => {
+                if validator(line.as_ref()) {
+                    return Some(line);
+                }
+            }
+            None => { break }
+        };
+    }
+    None
+
+
+}

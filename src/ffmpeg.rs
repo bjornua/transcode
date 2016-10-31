@@ -37,7 +37,6 @@ impl fmt::Display for Error {
     }
 }
 
-
 pub struct FFmpegIterator {
     process: process::Child,
     timeiter: TimeIterator<process::ChildStderr>,
