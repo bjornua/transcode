@@ -24,8 +24,9 @@ Currently the only target format is hardcoded and is:
 |-----------|-----------|-----------|
 |MKV        | Opus 192k | h.264 4.1 |
 
-## Requirements
-
+## Installation
+* Install rust (https://www.rust-lang.org/en-US/downloads.html)
+* Run `cargo install transcode`
 
 ## Motivation
 I ran into the problem of having many video files of various formats that needed to run on a raspberry pi.
