@@ -1,4 +1,6 @@
 # transcode
+[![Cargo version][cargo-image]][cargo-url]
+
 Command-line utility for converting directories of audio/video format to run on a raspberry pi.
 
 ## Example
@@ -36,3 +38,6 @@ Problems:
 * Files would be scattered in the file system.
 
 So i decided i wanted to write a more specific program for the job.
+
+[cargo-image]: https://img.shields.io/crates/v/transcode.svg
+[cargo-url]: https://crates.io/crates/transcode
