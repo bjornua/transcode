@@ -17,12 +17,12 @@ extern crate rustc_serialize;
 
 mod main {
     use args::{self, Args};
-    use conversion::{Conversions, self};
+    use conversion::{Conversions};
     use error;
     use ffmpeg;
     use path;
     use source::{Source, Sources, self};
-    use utils::{erase_up, prompt};
+    use utils::{prompt};
 
     pub enum Error {
         ArgError(args::Error),
@@ -57,13 +57,15 @@ mod main {
 
         print_sources(&sources);
         println!("");
-        let cont = prompt("Do you want to continue [y/n]?", |x| x == "y" || x == "n").map_or(false, |x| x == "y");
-        println!("");
-
+        let cont = prompt(
+            "Do you want to continue [y/n]?",
+            |x| x == "y" || x == "n"
+        ).map_or(false, |x| x == "y");
 
         if cont {
+            println!("");
             let conversions = Conversions::from_sources(sources);
-            try!(convert(conversions));
+            try!(conversions.convert());
         }
 
         Ok(())
@@ -86,39 +88,6 @@ mod main {
         for &Source { ref path, ..} in sources.iter() {
             println!("    {}", path.to_string_lossy());
         }
-    }
-
-    fn convert(mut conversions: Conversions) -> Result<(), (ffmpeg::Error)> {
-        let mut lines = 0;
-        for n in 0..conversions.len() {
-
-            // Okay, hope this scope thing is going to be better in the future :)
-            let (local_mpixel, ffmpeg_con): (f64, conversion::Conversion) = {
-                let ref mut c = conversions[n];
-                (c.source.ffprobe.mpixel(), c.clone())
-            };
-            for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con)) {
-                {
-                    let time = try!(time);
-                    let ref mut c = conversions[n];
-                    let local_progress = time / c.source.ffprobe.duration * local_mpixel;
-                    c.status.update(local_progress);
-                }
-                erase_up(lines);
-                lines = conversions.print_table();
-            }
-            {
-                let ref mut c = conversions[n];
-                c.status.end();
-            };
-            erase_up(lines);
-            lines = conversions.print_table();
-        }
-        erase_up(lines);
-        conversions.print_table();
-
-        print!("\n");
-        Ok(())
     }
 }
 

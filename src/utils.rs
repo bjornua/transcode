@@ -46,6 +46,4 @@ pub fn prompt<F: Fn(&str) -> bool>(question: &str, validator: F) -> Option<Strin
         };
     }
     None
-
-
 }

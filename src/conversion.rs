@@ -1,12 +1,14 @@
+use ffmpeg;
 use progress::{Status, status_sum};
 use source::{Sources, Source};
+use std::error::Error as StdError;
 use std::ffi::OsStr;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use target::Target;
 use utils::common_prefix;
-use std::error::Error as StdError;
-use std::fmt;
+use utils::{erase_up};
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
@@ -42,7 +44,7 @@ impl Conversion {
 }
 
 #[derive(Debug)]
-pub struct Conversions(Vec<Conversion>, Status);
+pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
     pub fn from_sources(s: Sources) -> Conversions {
@@ -62,10 +64,7 @@ impl Conversions {
             |((path, source), id)| Conversion::new(id, reprefix(&path, &base_path_new, base_path_len), source)
         ).collect();
 
-        let global_mpixel: f64 = (&conversions).into_iter().map(
-            |c| c.source.ffprobe.mpixel()
-        ).sum();
-        Conversions(conversions, Status::new(global_mpixel))
+        Conversions(conversions)
     }
     pub fn print_table(&self) -> usize {
         use table::print_table;
@@ -99,8 +98,6 @@ impl Conversions {
             ]
         }
 
-
-
         let conversions = self.into_iter().map(row).chain(once(vec![]));
 
         let global_status: Option<Status> = status_sum(self.into_iter().map(|&Conversion { ref status, ..}| status));
@@ -119,6 +116,36 @@ impl Conversions {
         print_table(Some(vec!["Path", "Status", "Eta", ""]), data)
     }
 
+    pub fn convert(mut self) -> Result<(), (ffmpeg::Error)> {
+        let mut lines = 0;
+        for n in 0..self.len() {
+            // Okay, hope this scope thing is going to be better in the future :)
+            let (local_mpixel, ffmpeg_con): (f64, Conversion) = {
+                let ref mut c = self[n];
+                (c.source.ffprobe.mpixel(), c.clone())
+            };
+            for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con)) {
+                {
+                    let time = try!(time);
+                    let ref mut c = self[n];
+                    let local_progress = time / c.source.ffprobe.duration * local_mpixel;
+                    c.status.update(local_progress);
+                }
+                erase_up(lines);
+                lines = self.print_table();
+            }
+            {
+                let ref mut c = self[n];
+                c.status.end();
+            };
+            erase_up(lines);
+            lines = self.print_table();
+        }
+        erase_up(lines);
+        self.print_table();
+        print!("\n");
+        Ok(())
+    }
 }
 
 impl Deref for Conversions {
