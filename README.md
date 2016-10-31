@@ -5,23 +5,22 @@ Command-line utility for converting directories of audio/video format to run on 
 ```bash
 transcode ~/Videos/Family ~/Videos/Vacation
 ```
-Converts video/audio files (mkv, avi, mp4, ...) to .mkv
+* Creates directory: `~/Videos - Converted/`
+* Converts video/audio files in `~/Videos/Family` to `~/Videos - Converted/Family`
+* Converts video/audio files in `~/Videos/Vacation` to `~/Videos - Converted/Vacation`
 
 ## Features
-* Shows %Done for individual files and total %Done
+* Shows progress for individual files and total progress
 * Shows ETA for individual files and total ETA
-* Takes directory as input, automatically identify audio/video files.
+* Takes directory as input, automatically identify audio/video files within.
 * Copies files that are already in the target format instead of processing.
 
-## Limitations
+## Formats
 Currently the only target format is hardcoded and is:
 
 | Container | Audio     | Video     |
 |-----------|-----------|-----------|
 |MKV        | Opus 192k | h.264 4.1 |
-
-## Screenshot
-
 
 ## Motivation
 I ran into the problem of having many video files of various formats that needed to run on a raspberry pi.
@@ -31,16 +30,6 @@ You could of course just loop through all the files. Though i found the followin
 
 Problems:
 * There is no ETA on when the script will finish.
-* 
+* Files would be scattered in the file system.
 
-Also i wanted to try out rust.
-
-## Future
-* Almost everything is hardcoded. Needs more configuration options.
-
-
-
-
-
-
-Tested to compile under windows
+So i decided i wanted to write a more specific program for the job.
