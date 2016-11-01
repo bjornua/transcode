@@ -64,6 +64,29 @@ impl fmt::Display for Error {
     }
 }
 
+pub fn print_error(e: &Error) {
+    match *e {
+        Error::ArgError(args::Error::MissingProgramName) => stack_printer(e),
+        Error::ArgError(ref e) => print_arg_error(e),
+        _ => stack_printer(e)
+    }
+}
+
+pub fn print_arg_error(e: &args::Error) {
+    use args::Error::*;
+    match *e {
+        MissingProgramName => (),
+        MissingInputs { ref program_name } => {
+            println!("Error: {}.", e);
+            println!("");
+            args::print_usage(program_name);
+        }
+        GetOptsFail { ref program_name, ref error } => {
+            println!("{:?}", error);
+            args::print_usage(program_name);
+        }
+    }
+}
 
 pub fn stack_printer(e: &StdError) {
     use utils::repeat_str;

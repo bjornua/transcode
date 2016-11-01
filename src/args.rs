@@ -36,27 +36,39 @@ impl fmt::Display for Error {
 }
 
 
+pub fn opts() -> Options {
+    let mut opts = Options::new();
+    opts.optflag("d", "dry-run", "No paths are created or updated");
+    opts.optflag("h", "help", "Display this help and exit");
+    opts
+}
+
+pub fn print_usage(program_name: &str) {
+    let brief = format!("Usage: {} [OPTION]... [PATH]...", program_name);
+    println!("{}", opts().usage(&brief));
+}
+
+
 
 #[derive(Debug)]
 pub struct Args {
     pub program_name: String,
-    pub input: Vec<String>,
+    pub paths: Vec<String>,
     pub dry_run: bool,
+    pub help: bool
 }
 
 impl Args {
     pub fn from_iter<T: IntoIterator<Item = String>>(args: T) -> Result<Args, Error> {
-        let args: Vec<_> = args.into_iter().collect();
+        let mut args = args.into_iter();
 
-        let program_name = match args.get(0) {
+        let program_name = match args.next() {
             Some(s) => s.clone(),
             None => return Err(MissingProgramName),
         };
 
-        let mut opts = Options::new();
-        opts.optflag("", "dry-run", "No paths are created or updated");
 
-        let args = match opts.parse(args) {
+        let args = match opts().parse(args) {
             Ok(a) => a,
             Err(e) => {
                 return Err(Error::GetOptsFail {
@@ -65,16 +77,19 @@ impl Args {
                 })
             }
         };
-
-        if args.free.len() == 0 {
-            return Err(MissingInputs { program_name: program_name });
-        }
-
         let dry_run = args.opt_present("dry-run");
+        let help = args.opt_present("help");
+        let paths = match args.free.len() {
+            0 => vec![".".to_string()],
+            _ => args.free
+        };
+
+
         Ok(Args {
             program_name: program_name,
             dry_run: dry_run,
-            input: args.free,
+            help: help,
+            paths: paths,
         })
     }
     pub fn from_env() -> Result<Args, Error> {

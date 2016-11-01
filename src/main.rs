@@ -21,11 +21,11 @@ use std::process::exit;
 pub fn main() {
     let exit_code = match run() {
         Err(error::Error::NoSourcesError) => {
-            error::stack_printer(&error::Error::NoSourcesError);
+            error::print_error(&error::Error::NoSourcesError);
             0
         }
         Err(e) => {
-            error::stack_printer(&e);
+            error::print_error(&e);
             1
         }
         Ok(()) => 0
@@ -35,7 +35,13 @@ pub fn main() {
 
 pub fn run() -> Result<(), error::Error> {
     let args = try!(args::Args::from_env());
-    let (sources, bads) = try!(source::Sources::from_paths(args.input));
+
+    if args.help {
+        ::args::print_usage(&args.program_name);
+        return Ok(())
+    }
+
+    let (sources, bads) = try!(source::Sources::from_paths(args.paths));
 
     if bads.len() > 0 {
         print_bads(bads.as_slice());
