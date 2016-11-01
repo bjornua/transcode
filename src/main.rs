@@ -19,8 +19,12 @@ use std::process::exit;
 
 pub fn main() {
     let exit_code = match run() {
+        Err(error::Error::NoSourcesError) => {
+            error::stack_printer(&error::Error::NoSourcesError);
+            0
+        }
         Err(e) => {
-            error::print_error(e);
+            error::stack_printer(&e);
             1
         }
         Ok(()) => 0
@@ -31,12 +35,18 @@ pub fn main() {
 pub fn run() -> Result<(), error::Error> {
     let args = try!(args::Args::from_env());
     let (sources, bads) = try!(source::Sources::from_paths(args.input));
-    let conversions = try!(conversion::Conversions::from_sources(sources));
 
     if bads.len() > 0 {
         print_bads(bads.as_slice());
         println!("");
     }
+
+    if sources.len() == 0 {
+        return Err(error::Error::NoSourcesError)
+    }
+
+    let conversions = try!(conversion::Conversions::from_sources(sources));
+
     print_sources(&conversions);
     println!("");
     if utils::prompt_continue() {

@@ -18,7 +18,7 @@ pub enum Error {
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::IO(ref s) => s.description(),
+            Error::IO(_) => "IO Error",
             Error::NoStderr => "There was no stderr in ffmpeg command for some reason",
             Error::RunError { .. } => "FFmpeg outputted something unexpected"
         }
@@ -34,7 +34,10 @@ impl StdError for Error {
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.description())
+        match *self {
+            Error::IO( _) |Error::NoStderr => write!(f, "{}", self.description()),
+            Error::RunError { ref stdout, ref stderr } => write!(f, "{}\nStdOut:\n{}StdErr:\n{}", self.description(), stdout, stderr),
+        }
     }
 }
 

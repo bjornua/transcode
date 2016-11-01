@@ -32,11 +32,10 @@ impl StdError for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::PathError {ref error, ref path} => {
-                write!(f, "{desc}: {path:?} ({errordesc})",
+            Error::PathError {ref path, ..} => {
+                write!(f, "{desc}: {path:?}",
                     desc=self.description(),
-                    path=path,
-                    errordesc=error.description()
+                    path=path
                 )
             },
             Error::FFProbeError {.. } => {
