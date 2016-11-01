@@ -17,7 +17,7 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::FFProbeError { ref error, .. } => error.description(),
-            Error::PathError { ref error, .. } => error.description()
+            Error::PathError { .. } => "Could not expand path"
         }
     }
 
@@ -29,7 +29,22 @@ impl StdError for Error {
     }
 }
 
-impl fmt::Display for Error { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.description()) } }
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::PathError {ref error, ref path} => {
+                write!(f, "{desc}: {path:?} ({errordesc})",
+                    desc=self.description(),
+                    path=path,
+                    errordesc=error.description()
+                )
+            },
+            Error::FFProbeError {.. } => {
+                write!(f, "{}", self.description())
+            }
+        }
+    }
+}
 
 type SourceOk<T> = Result<T, Error>;
 
@@ -78,36 +93,50 @@ impl DerefMut for Sources {
 }
 
 impl Sources {
-    pub fn from_paths<T, U>(paths: T) -> (Self, Vec<Error>) where T: IntoIterator<Item=U>, U: Into<PathBuf> {
-        let mut paths = paths.into_iter()
-            .flat_map(|p| resolve_path(p.into())).collect::<Vec<_>>();
+    pub fn from_paths<T, U>(paths: T) -> Result<(Self, Vec<Error>), Error> where T: IntoIterator<Item=U>, PathBuf: From<U> {
+        let paths: Result<Vec<_>, Error> =
+            paths
+                .into_iter()
+                .map(PathBuf::from)
+                .map(canonicalize)
+                .collect();
 
-        paths.sort();
-        paths.dedup();
+        let mut expanded_paths: Vec<PathBuf> = try!(paths)
+            .into_iter()
+            .flat_map(expand_path)
+            .collect();
 
-        let sources = paths.into_iter().map(
+        expanded_paths.sort();
+        expanded_paths.dedup();
+
+        let sources = expanded_paths.into_iter().map(
             |path| ffprobe_it(&path).map(
                 |probe| Source { path: path, ffprobe: probe }
             )
         );
 
-        let (good, bad): (Vec<_>, Vec<_>) = sources.partition(|x| x.is_ok());
+        let (good, ffprobe_fail): (Vec<_>, Vec<_>) = sources.partition(|x| x.is_ok());
 
         let good = good.into_iter().filter_map(|x| x.ok());
-        let bad = bad.into_iter().filter_map(|x| x.err());
+        let ffprobe_fail = ffprobe_fail.into_iter().filter_map(|x| x.err());
 
-        (Sources(good.collect()), bad.collect())
+        Ok((Sources(good.collect()), ffprobe_fail.collect()))
     }
 }
 
-fn resolve_path(path: PathBuf) -> Vec<PathBuf> {
+fn canonicalize(path: PathBuf) -> Result<PathBuf, Error> {
+    match path.canonicalize() {
+        Err(e) => Err(Error::PathError { error: e, path: path }),
+        Ok(p) => Ok(p)
+    }
+}
+
+fn expand_path(path: PathBuf) -> Vec<PathBuf> {
     use path::{RecursivePathIterator, PathType};
-    // use self::ErrorKind;
-    let path = match path.canonicalize() {
-        Err(_) => return vec![],
-        Ok(p) => p
-    };
     let paths: Vec<PathBuf> = match path.is_dir() {
+        false => {
+            vec![path]
+        }
         true => {
             RecursivePathIterator::new(path).filter_map(|x| {
                 match x {
@@ -115,9 +144,6 @@ fn resolve_path(path: PathBuf) -> Vec<PathBuf> {
                     PathType::File(p) => Some(p)
                 }
             }).collect()
-        }
-        false => {
-            vec![path]
         }
     };
     return paths

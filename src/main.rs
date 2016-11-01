@@ -30,7 +30,7 @@ pub fn main() {
 
 pub fn run() -> Result<(), error::Error> {
     let args = try!(args::Args::from_env());
-    let (sources, bads) = source::Sources::from_paths(args.input);
+    let (sources, bads) = try!(source::Sources::from_paths(args.input));
     let conversions = try!(conversion::Conversions::from_sources(sources));
 
     if bads.len() > 0 {

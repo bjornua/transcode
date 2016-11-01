@@ -1,12 +1,14 @@
 use args;
 use ffmpeg;
 use conversion;
+use source;
 use std::error::Error as StdError;
 
 pub enum Error {
     ArgError(args::Error),
     FFmpegError(ffmpeg::Error),
-    ConversionError(conversion::Error)
+    ConversionError(conversion::Error),
+    SourceError(source::Error),
 }
 impl From<ffmpeg::Error> for Error {
     fn from(err: ffmpeg::Error) -> Self {
@@ -16,6 +18,12 @@ impl From<ffmpeg::Error> for Error {
 impl From<args::Error> for Error {
     fn from(err: args::Error) -> Self {
         Error::ArgError(err)
+    }
+}
+
+impl From<source::Error> for Error {
+    fn from(err: source::Error) -> Self {
+        Error::SourceError(err)
     }
 }
 impl From<conversion::Error> for Error {
@@ -30,7 +38,8 @@ pub fn print_error(k: Error) {
     match k {
         ArgError(e) => print_arg_error(e),
         ConversionError(e) => print_conversion_error(e),
-        FFmpegError(e) => print_ffmpeg_error(e)
+        FFmpegError(e) => print_ffmpeg_error(e),
+        SourceError(e) => print_source_error(e),
     }
     println!("-----------------------------------------------");
 }
@@ -63,5 +72,8 @@ fn print_ffmpeg_error(err: ffmpeg::Error) {
 
 fn print_conversion_error(err: conversion::Error) {
     println!("Conversion error");
+    println!("{}", err);
+}
+fn print_source_error(err: source::Error) {
     println!("{}", err);
 }
