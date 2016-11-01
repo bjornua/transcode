@@ -61,12 +61,12 @@ fn print_bads(bads: &[source::Error]) {
     println!("Skipping non video/audio files:");
     for error in bads {
         let path = match *error {
-            source::Error::FFProbeError { ref path,.. }
-            | source::Error::PathError {ref path,..} => {
-                path::find_relative_cwd(path).ok()
+            source::Error::FFProbeError { ref path, .. }
+            | source::Error::PathError { ref path, ..} => {
+                path.to_string_lossy()
             }
         };
-        println!("    {}", path.as_ref().map(|p| p.to_string_lossy()).unwrap_or("".into()));
+        println!("    {}", path)
     }
 }
 

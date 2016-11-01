@@ -44,8 +44,6 @@ impl fmt::Display for Error {
     }
 }
 
-
-
 impl Conversion {
     pub fn new(id: u64, path: PathBuf, source: Source) -> Self {
         let status = Status::new(source.ffprobe.mpixel());
@@ -98,7 +96,6 @@ impl Conversions {
         use table::Cell::{self, Text, Empty};
         use table::Alignment::{Left, Right};
         use time::pretty_centiseconds;
-        use std::borrow::Cow;
         use strings::truncate_left;
         use std::iter::once;
         fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
@@ -113,13 +110,8 @@ impl Conversions {
         }
 
         fn row<'a>(c: &'a Conversion) -> Vec<Cell<'a>> {
-            let paths: Cow<'a, str> = match ::path::find_relative_cwd(c.target.path.as_path()) {
-                Ok(p) => Cow::Owned(p.to_string_lossy().into_owned()),
-                Err(_) => { c.target.path.to_string_lossy() }
-            };
-
             vec![
-                Text(Left(truncate_left(paths, "...", 60))),
+                Text(Left(truncate_left(c.target.path.to_string_lossy(), "...", 60))),
                 Text(Left((&c.status).into())),
                 eta(&c.status),
             ]
