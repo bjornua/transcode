@@ -1,18 +1,18 @@
 use conversion;
-use regexreader::{RegexReadIterator};
-use std::error::{Error as StdError};
+use regexreader::RegexReadIterator;
+use std::error::Error as StdError;
 use std::ffi::OsStr;
 use std::fmt;
-use std::io::{Read, self};
-use std::process::{Command, Stdio, self};
-use std::str::{self};
+use std::io::{self, Read};
+use std::process::{self, Command, Stdio};
+use std::str;
 use path;
 
 #[derive(Debug)]
 pub enum Error {
     IO(io::Error),
     NoStderr,
-    RunError {stdout: String, stderr: String}
+    RunError { stdout: String, stderr: String },
 }
 
 impl StdError for Error {
@@ -20,7 +20,7 @@ impl StdError for Error {
         match *self {
             Error::IO(_) => "IO Error",
             Error::NoStderr => "There was no stderr in ffmpeg command for some reason",
-            Error::RunError { .. } => "FFmpeg outputted something unexpected"
+            Error::RunError { .. } => "FFmpeg outputted something unexpected",
         }
     }
 
@@ -28,15 +28,21 @@ impl StdError for Error {
         match *self {
             Error::IO(ref s) => Some(s),
             Error::NoStderr => None,
-            Error::RunError { .. } => None
+            Error::RunError { .. } => None,
         }
     }
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::IO( _) |Error::NoStderr => write!(f, "{}", self.description()),
-            Error::RunError { ref stdout, ref stderr } => write!(f, "{}\nStdOut:\n{}StdErr:\n{}", self.description(), stdout, stderr),
+            Error::IO(_) | Error::NoStderr => write!(f, "{}", self.description()),
+            Error::RunError { ref stdout, ref stderr } => {
+                write!(f,
+                       "{}\nStdOut:\n{}StdErr:\n{}",
+                       self.description(),
+                       stdout,
+                       stderr)
+            }
         }
     }
 }
@@ -52,40 +58,44 @@ pub struct FFmpegIterator {
     process: process::Child,
     timeiter: TimeIterator<process::ChildStderr>,
     stdout: process::ChildStdout,
-    read_once: bool
+    read_once: bool,
 }
 impl FFmpegIterator {
-    pub fn new(con: conversion::Conversion) -> Result<Self, Error> {
+    pub fn new(con: conversion::Conversion, dry_run: bool) -> Result<Self, Error> {
         let mut c = Command::new("ffmpeg");
 
         let mut args: Vec<&OsStr> = Vec::new();
-        args.extend(&[
-            OsStr::new("-i"),       con.source.path.as_ref(),
-            OsStr::new("-f"),       OsStr::new("matroska")
-        ]);
+        args.extend(&[OsStr::new("-i"),
+                      con.source.path.as_ref(),
+                      OsStr::new("-f"),
+                      OsStr::new("matroska")]);
 
         if let Some(video) = con.source.ffprobe.video {
-            if video.codec == "h264" { // Already the right codec, just copy
-                args.extend(&[
-                    OsStr::new("-c:v"),     OsStr::new("copy")
-                ]);
+            if video.codec == "h264" {
+                // Already the right codec, just copy
+                args.extend(&[OsStr::new("-c:v"), OsStr::new("copy")]);
             } else {
-                args.extend(&[
-                    OsStr::new("-c:v"),     OsStr::new("libx264"),
-                    OsStr::new("-level"),   OsStr::new("4.1"),
-                    OsStr::new("-preset"),  OsStr::new("ultrafast"),
-                    OsStr::new("-crf"),     OsStr::new("18")
-                ]);
+                args.extend(&[OsStr::new("-c:v"),
+                              OsStr::new("libx264"),
+                              OsStr::new("-level"),
+                              OsStr::new("4.1"),
+                              OsStr::new("-preset"),
+                              OsStr::new("ultrafast"),
+                              OsStr::new("-crf"),
+                              OsStr::new("18")]);
             }
         }
-        args.extend(&[
-            OsStr::new("-c:a"),     OsStr::new("opus"),
-            OsStr::new("-b:a"),     OsStr::new("192k"),
-            OsStr::new("-y"),
-            con.target.path.as_ref()
-        ]);
-        // println!("{}", args.iter().map(|x| format!("{:?}", x.to_string_lossy())).collect::<Vec<_>>().join(" "));
-        // panic!();
+        args.extend(&[OsStr::new("-c:a"),
+                      OsStr::new("opus"),
+                      OsStr::new("-b:a"),
+                      OsStr::new("192k")]);
+
+        if dry_run {
+            args.extend(&[OsStr::new("-y"), OsStr::new("/dev/null")]);
+        } else {
+            args.extend(&[con.target.path.as_ref()]);
+        }
+
         c.args(args.as_slice());
 
         c.stderr(Stdio::piped());
@@ -103,10 +113,10 @@ impl FFmpegIterator {
                     process: child,
                     stdout: stdout,
                     timeiter: TimeIterator::new(stderr),
-                    read_once: false
+                    read_once: false,
                 })
             }
-            (_, _) => Err(Error::NoStderr)
+            (_, _) => Err(Error::NoStderr),
         }
     }
 }
@@ -117,7 +127,7 @@ impl Iterator for FFmpegIterator {
 
         for x in &mut self.timeiter {
             self.read_once = true;
-            return Some(Ok(x))
+            return Some(Ok(x));
         }
         let _ = self.process.wait();
         if !self.read_once {
@@ -125,11 +135,13 @@ impl Iterator for FFmpegIterator {
             let mut buffer_out: Vec<u8> = Vec::new();
             let _ = self.stdout.read_to_end(&mut buffer_out);
             let buffer_out = String::from_utf8_lossy(&buffer_out).into_owned();
-            return Some(Err(Error::RunError { stdout: buffer_out, stderr: buffer_err }))
+            return Some(Err(Error::RunError {
+                stdout: buffer_out,
+                stderr: buffer_err,
+            }));
         }
         None
     }
-
 }
 
 pub struct TimeIterator<T: Read>(pub RegexReadIterator<T>);
@@ -147,9 +159,10 @@ impl<'a, T: Read> Iterator for TimeIterator<T> {
         let &mut TimeIterator(ref mut regexiter) = self;
         for c in regexiter {
             if let Ok(c) = c {
-                let mut i = c.into_iter().skip(1).take(3).filter_map(
-                    |x| x.and_then(|x| x.parse::<f64>().ok())
-                );
+                let mut i = c.into_iter()
+                    .skip(1)
+                    .take(3)
+                    .filter_map(|x| x.and_then(|x| x.parse::<f64>().ok()));
 
                 if let (Some(h), Some(m), Some(s)) = (i.next(), i.next(), i.next()) {
                     let seconds = h * 3600. + m * 60. + s;
@@ -157,6 +170,6 @@ impl<'a, T: Read> Iterator for TimeIterator<T> {
                 };
             };
         }
-        return None
+        return None;
     }
 }

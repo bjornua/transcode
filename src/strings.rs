@@ -1,7 +1,10 @@
 
 use std::borrow::Cow;
 
-pub fn truncate_middle<'a>(a: Cow<'a, str>, filler: &'static str, max_width: usize) -> Cow<'a, str> {
+pub fn truncate_middle<'a>(a: Cow<'a, str>,
+                           filler: &'static str,
+                           max_width: usize)
+                           -> Cow<'a, str> {
     let length = a.len();
 
     if length <= max_width {
@@ -13,7 +16,7 @@ pub fn truncate_middle<'a>(a: Cow<'a, str>, filler: &'static str, max_width: usi
     if max_width < filler_length + 2 {
         match a {
             Cow::Borrowed(a) => a[..max_width].into(),
-            Cow::Owned(a) => a[..max_width].to_string().into()
+            Cow::Owned(a) => a[..max_width].to_string().into(),
         }
     } else {
         let cut = length - max_width + filler_length;
@@ -21,7 +24,7 @@ pub fn truncate_middle<'a>(a: Cow<'a, str>, filler: &'static str, max_width: usi
 
         let cut_left = cut / 2;
         let cut_right = cut - cut_left;
-        vec![&a[..(middle-cut_left)], filler, &a[(middle+cut_right)..]].concat().into()
+        vec![&a[..(middle - cut_left)], filler, &a[(middle + cut_right)..]].concat().into()
     }
 }
 
@@ -37,7 +40,7 @@ pub fn truncate_left<'a>(a: Cow<'a, str>, filler: &'static str, max_width: usize
     if max_width < filler_length + 1 {
         match a {
             Cow::Borrowed(a) => a[..max_width].into(),
-            Cow::Owned(a) => a[..max_width].to_string().into()
+            Cow::Owned(a) => a[..max_width].to_string().into(),
         }
     } else {
         let cut = length - max_width + filler_length;

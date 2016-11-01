@@ -8,37 +8,42 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use target::Target;
 use utils::common_prefix;
-use utils::{erase_up};
+use utils::erase_up;
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
     id: u64,
     pub source: Source,
     pub target: Target,
-    pub status: Status
+    pub status: Status,
 }
 
 #[derive(Debug)]
 pub enum Error {
-    TargetDirExists { target_dir: PathBuf }
+    TargetDirExists { target_dir: PathBuf },
 }
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::TargetDirExists { .. } => "Target directory exists"
+            Error::TargetDirExists { .. } => "Target directory exists",
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            Error::TargetDirExists { .. } => None
+            Error::TargetDirExists { .. } => None,
         }
     }
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::TargetDirExists {ref target_dir} => write!(f, "{}: {}", self.description(), target_dir.to_string_lossy())
+            Error::TargetDirExists { ref target_dir } => {
+                write!(f,
+                       "{}: {}",
+                       self.description(),
+                       target_dir.to_string_lossy())
+            }
         }
 
     }
@@ -48,7 +53,12 @@ impl Conversion {
     pub fn new(id: u64, path: PathBuf, source: Source) -> Self {
         let status = Status::new(source.ffprobe.mpixel());
         let target = Target { path: path };
-        Conversion { id: id, target: target, source: source, status: status }
+        Conversion {
+            id: id,
+            target: target,
+            source: source,
+            status: status,
+        }
     }
 }
 
@@ -65,7 +75,8 @@ impl Conversions {
 
         use std::ffi::OsString;
         let (base_path_len, target_dir): (usize, PathBuf) = {
-            let mut base_path: Vec<OsString> = get_longest_prefix(&paths).into_iter().map(|x| x.to_os_string()).collect();
+            let mut base_path: Vec<OsString> =
+                get_longest_prefix(&paths).into_iter().map(|x| x.to_os_string()).collect();
             let base_path_len = base_path.len();
             let mut folder_name = base_path.pop().unwrap_or_else(|| OsString::new());
             folder_name.push(" - Converted");
@@ -74,20 +85,18 @@ impl Conversions {
         };
 
         if target_dir.exists() {
-            return Err(Error::TargetDirExists {target_dir: target_dir})
+            return Err(Error::TargetDirExists { target_dir: target_dir });
         }
 
-        let target_paths = paths.into_iter().map(
-            |path| convert_path(&path, &target_dir, base_path_len, "mkv".as_ref())
-        );
+        let target_paths = paths.into_iter()
+            .map(|path| convert_path(&path, &target_dir, base_path_len, "mkv".as_ref()));
 
-        let conversions: Vec<_> = (target_paths).into_iter().zip(s).zip(0..).map(
-            |((target_path, source), id)| Conversion::new(
-                id,
-                target_path,
-                source
-            )
-        ).collect();
+        let conversions: Vec<_> = (target_paths)
+            .into_iter()
+            .zip(s)
+            .zip(0..)
+            .map(|((target_path, source), id)| Conversion::new(id, target_path, source))
+            .collect();
 
         Ok(Conversions(conversions))
     }
@@ -104,8 +113,8 @@ impl Conversions {
         fn eta<'a>(s: &Status) -> Cell<'a> {
             match *s {
                 Status::Pending(_) => Empty,
-                Status::Progress(ref p) => { p.eta().map_or(Empty, seconds_to_cell) },
-                Status::Done(ref p) => seconds_to_cell(p.duration)
+                Status::Progress(ref p) => p.eta().map_or(Empty, seconds_to_cell),
+                Status::Done(ref p) => seconds_to_cell(p.duration),
             }
         }
 
@@ -119,15 +128,17 @@ impl Conversions {
 
         let conversions = self.into_iter().map(row).chain(once(vec![]));
 
-        let global_status: Option<Status> = status_sum(self.into_iter().map(|&Conversion { ref status, ..}| status));
+        let global_status: Option<Status> = status_sum(self.into_iter()
+            .map(|&Conversion { ref status, .. }| status));
 
         let sums = match global_status {
-            Some(ref global_status) => vec![vec![], vec![
-                Text(Left("Total".into())),
-                Text(Left(global_status.into())),
-                eta(global_status)
-            ]],
-            None => vec![]
+            Some(ref global_status) => {
+                vec![vec![],
+                     vec![Text(Left("Total".into())),
+                          Text(Left(global_status.into())),
+                          eta(global_status)]]
+            }
+            None => vec![],
         };
 
         let data = conversions.chain(sums);
@@ -135,7 +146,7 @@ impl Conversions {
         print_table(Some(vec!["Path", "Status", "Eta", ""]), data)
     }
 
-    pub fn convert(mut self) -> Result<(), (ffmpeg::Error)> {
+    pub fn convert(mut self, dry_run: bool) -> Result<(), (ffmpeg::Error)> {
         let mut lines = 0;
         for n in 0..self.len() {
             // Okay, hope this scope thing is going to be better in the future :)
@@ -143,7 +154,7 @@ impl Conversions {
                 let ref mut c = self[n];
                 (c.source.ffprobe.mpixel(), c.clone())
             };
-            for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con)) {
+            for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con, dry_run)) {
                 {
                     let time = try!(time);
                     let ref mut c = self[n];
@@ -169,10 +180,14 @@ impl Conversions {
 
 impl Deref for Conversions {
     type Target = [Conversion];
-    fn deref(&self) -> &Self::Target { &self.0 }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 impl DerefMut for Conversions {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 fn convert_path(p: &PathBuf, new_prefix: &PathBuf, count: usize, extension: &OsStr) -> PathBuf {
@@ -182,16 +197,18 @@ fn convert_path(p: &PathBuf, new_prefix: &PathBuf, count: usize, extension: &OsS
 }
 
 fn get_longest_prefix<'a>(paths: &'a [PathBuf]) -> Vec<&'a OsStr> {
-    let components: Vec<_> = paths.into_iter().map(|p| {
-        let mut p: Vec<_> = p.into_iter().collect();
-        p.pop();
-        p
-    }).collect();
+    let components: Vec<_> = paths.into_iter()
+        .map(|p| {
+            let mut p: Vec<_> = p.into_iter().collect();
+            p.pop();
+            p
+        })
+        .collect();
 
     let mut iter = components.iter();
     let longest = match iter.next() {
         Some(s) => s.as_slice(),
-        None => &[]
+        None => &[],
     };
 
     let longest = iter.fold(longest, |longest, new| common_prefix(longest, new));

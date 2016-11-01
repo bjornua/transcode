@@ -14,6 +14,7 @@ pub mod time;
 pub mod utils;
 extern crate regex;
 extern crate rustc_serialize;
+extern crate getopts;
 
 use std::process::exit;
 
@@ -49,9 +50,10 @@ pub fn run() -> Result<(), error::Error> {
 
     print_sources(&conversions);
     println!("");
+
     if utils::prompt_continue() {
         println!("");
-        try!(conversions.convert());
+        try!(conversions.convert(args.dry_run));
     }
 
     Ok(())

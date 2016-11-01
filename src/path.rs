@@ -8,16 +8,14 @@ use utils::common_prefix;
 #[derive(Debug)]
 pub enum PathType {
     Directory(PathBuf),
-    File(PathBuf)
+    File(PathBuf),
 }
 
 pub struct PathIterator(Option<ReadDir>);
 
 impl PathIterator {
     pub fn new<T: AsRef<Path>>(path: T) -> Self {
-        PathIterator(
-            path.as_ref().read_dir().ok()
-        )
+        PathIterator(path.as_ref().read_dir().ok())
     }
 }
 impl Iterator for PathIterator {
@@ -26,21 +24,18 @@ impl Iterator for PathIterator {
         let PathIterator(ref mut iterator) = *self;
         loop {
             let path = match iterator.as_mut().and_then(|i| i.next()) {
-                Some(Ok(entry)) => {
-                    entry
+                    Some(Ok(entry)) => entry,
+                    Some(Err(_)) => continue,
+                    None => {
+                        iterator.take();
+                        return None;
+                    }
                 }
-                Some(Err(_)) => {
-                    continue
-                }
-                None => {
-                    iterator.take();
-                    return None;
-                }
-            }.path();
+                .path();
 
             return Some(match path.is_dir() {
                 true => PathType::Directory(path),
-                false => PathType::File(path)
+                false => PathType::File(path),
             });
         }
     }
@@ -48,14 +43,14 @@ impl Iterator for PathIterator {
 
 pub struct RecursivePathIterator {
     iterator: PathIterator,
-    tail: Vec<PathBuf>
+    tail: Vec<PathBuf>,
 }
 
 impl RecursivePathIterator {
     pub fn new<T: AsRef<Path>>(path: T) -> Self {
         RecursivePathIterator {
             iterator: PathIterator::new(path),
-            tail: Vec::new()
+            tail: Vec::new(),
         }
     }
 }
@@ -63,7 +58,7 @@ impl RecursivePathIterator {
 impl Iterator for RecursivePathIterator {
     type Item = PathType;
     fn next(&mut self) -> Option<Self::Item> {
-        let &mut RecursivePathIterator{ ref mut iterator, ref mut tail} = self;
+        let &mut RecursivePathIterator { ref mut iterator, ref mut tail } = self;
 
         loop {
             if let Some(path) = iterator.next() {
@@ -97,11 +92,10 @@ pub fn find_relative_cwd<'a>(a: &'a Path) -> Result<PathBuf, io::Error> {
     Ok(find_relative(a, try!(current_dir()).as_ref()))
 }
 
-pub fn mkdir_parent(path: &Path) -> io::Result<()>  {
+pub fn mkdir_parent(path: &Path) -> io::Result<()> {
     let parent = match path.parent() {
         Some(p) => p,
-        None => return Ok(())
+        None => return Ok(()),
     };
     create_dir_all(parent)
 }
-

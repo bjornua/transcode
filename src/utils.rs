@@ -20,12 +20,10 @@ pub fn erase_up(lines: usize) {
     print!("\r");
 }
 
-pub fn common_prefix<'a, T: PartialEq>(a: &'a[T], b: &[T]) -> &'a[T] {
-    let common = a.into_iter().zip(b.into_iter()).take_while(
-        |&(a, b)| a == b
-    );
+pub fn common_prefix<'a, T: PartialEq>(a: &'a [T], b: &[T]) -> &'a [T] {
+    let common = a.into_iter().zip(b.into_iter()).take_while(|&(a, b)| a == b);
 
-    return &a[0..common.count()]
+    return &a[0..common.count()];
 }
 
 
@@ -42,15 +40,12 @@ pub fn prompt<F: Fn(&str) -> bool>(question: &str, validator: F) -> Option<Strin
                     return Some(line);
                 }
             }
-            None => { break }
+            None => break,
         };
     }
     None
 }
 
 pub fn prompt_continue() -> bool {
-    prompt(
-        "Do you want to continue [y/n]?",
-        |s| s == "y" || s == "n"
-    ).map_or(false, |s| s == "y")
+    prompt("Do you want to continue [y/n]?", |s| s == "y" || s == "n").map_or(false, |s| s == "y")
 }

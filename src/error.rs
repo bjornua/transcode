@@ -11,7 +11,7 @@ pub enum Error {
     FFmpegError(ffmpeg::Error),
     ConversionError(conversion::Error),
     SourceError(source::Error),
-    NoSourcesError
+    NoSourcesError,
 }
 
 impl From<ffmpeg::Error> for Error {
@@ -43,7 +43,7 @@ impl StdError for Error {
             Error::ArgError(_) => "Argument error",
             Error::FFmpegError(_) => "FFmpeg error",
             Error::ConversionError(_) => "Conversion error",
-            Error::NoSourcesError => "No sources where found"
+            Error::NoSourcesError => "No sources were found",
         }
     }
 
@@ -78,53 +78,3 @@ pub fn stack_printer(e: &StdError) {
         level += 1;
     }
 }
-
-
-
-
-// pub fn print_error(k: Error) {
-//     use self::Error::*;
-//     println!("\n-------------------- Error --------------------");
-//     match k {
-//         ArgError(e) => print_arg_error(e),
-//         ConversionError(e) => print_conversion_error(e),
-//         FFmpegError(e) => print_ffmpeg_error(e),
-//         SourceError(e) => print_source_error(e),
-//         NoSourcesError
-//     }
-//     println!("-----------------------------------------------");
-// }
-
-
-// fn print_arg_error(kind: args::Error) {
-//     use args::Error::*;
-//     println!("Error: Argument failure ({})", kind.description());;
-//     match kind {
-//         MissingProgramName => {
-//             ()
-//         },
-//         MissingInputs { program_name } => {
-//             println!("");
-//             println!("Usage: {}", args::Args::usage(program_name))
-//         },
-//     }
-// }
-
-// fn print_ffmpeg_error(err: ffmpeg::Error) {
-//     println!("Error: FFmpeg failure ({})", err.description());
-//     match err {
-//         ffmpeg::Error::RunError {stdout, stderr} => {
-//             println!("FFmpeg stderr:\n{}\n\nFFmpeg stdout:\n{}", stderr.trim(), stdout.trim())
-//         },
-//         ffmpeg::Error::IO(_) => (),
-//         ffmpeg::Error::NoStderr => ()
-//     }
-// }
-
-// fn print_conversion_error(err: conversion::Error) {
-//     println!("Conversion error");
-//     println!("{}", err);
-// }
-// fn print_source_error(err: source::Error) {
-//     println!("{}", err);
-// }

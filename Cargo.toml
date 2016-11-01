@@ -13,3 +13,4 @@ debug = true
 [dependencies]
 rustc-serialize = "0.3.19"
 regex = "0.1.77"
+getopts = "0.2"
