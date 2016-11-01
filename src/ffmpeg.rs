@@ -10,33 +10,39 @@ use path;
 
 #[derive(Debug)]
 pub enum Error {
-    IO(io::Error),
+    MkDirError(io::Error),
+    SpawnError(io::Error),
     NoStderr,
-    RunError { stdout: String, stderr: String },
+    OutputError { stdout: String, stderr: String },
 }
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::IO(_) => "IO Error",
+            Error::MkDirError(_) => "Could not make directory",
+            Error::SpawnError(ref e) if e.kind() == io::ErrorKind::NotFound => "Could not spawn ffmpeg (is ffmpeg installed?)",
+            Error::SpawnError(_) => "Could not spawn ffmpeg",
             Error::NoStderr => "There was no stderr in ffmpeg command for some reason",
-            Error::RunError { .. } => "FFmpeg outputted something unexpected",
+            Error::OutputError { .. } => "FFmpeg outputted something unexpected",
         }
     }
 
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            Error::IO(ref s) => Some(s),
+            Error::MkDirError(ref s) => Some(s),
+            Error::SpawnError(ref s) => Some(s),
             Error::NoStderr => None,
-            Error::RunError { .. } => None,
+            Error::OutputError { .. } => None,
         }
     }
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::IO(_) | Error::NoStderr => write!(f, "{}", self.description()),
-            Error::RunError { ref stdout, ref stderr } => {
+            Error::MkDirError(_) |
+            Error::SpawnError(_) |
+            Error::NoStderr => write!(f, "{}", self.description()),
+            Error::OutputError { ref stdout, ref stderr } => {
                 write!(f,
                        "{}\nStdOut:\n{}StdErr:\n{}",
                        self.description(),
@@ -46,13 +52,6 @@ impl fmt::Display for Error {
         }
     }
 }
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::IO(err)
-    }
-}
-
 
 pub struct FFmpegIterator {
     process: process::Child,
@@ -102,9 +101,10 @@ impl FFmpegIterator {
         c.stdout(Stdio::piped());
         c.stdin(Stdio::null());
 
-        try!(path::mkdir_parent(&con.target.path));
-
-        let mut child = c.spawn().unwrap();
+        if !dry_run {
+            try!(path::mkdir_parent(&con.target.path).map_err(|e| Error::MkDirError(e)));
+        }
+        let mut child = try!(c.spawn().map_err(|e| Error::SpawnError(e)));
         let stderr = child.stderr.take();
         let stdout = child.stdout.take();
         match (stderr, stdout) {
@@ -135,7 +135,7 @@ impl Iterator for FFmpegIterator {
             let mut buffer_out: Vec<u8> = Vec::new();
             let _ = self.stdout.read_to_end(&mut buffer_out);
             let buffer_out = String::from_utf8_lossy(&buffer_out).into_owned();
-            return Some(Err(Error::RunError {
+            return Some(Err(Error::OutputError {
                 stdout: buffer_out,
                 stderr: buffer_err,
             }));

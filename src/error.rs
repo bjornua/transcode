@@ -68,7 +68,7 @@ pub fn print_error(e: &Error) {
     match *e {
         Error::ArgError(args::Error::MissingProgramName) => stack_printer(e),
         Error::ArgError(ref e) => print_arg_error(e),
-        _ => stack_printer(e)
+        _ => stack_printer(e),
     }
 }
 

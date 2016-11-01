@@ -28,7 +28,7 @@ pub fn main() {
             error::print_error(&e);
             1
         }
-        Ok(()) => 0
+        Ok(()) => 0,
     };
     exit(exit_code)
 }
@@ -38,7 +38,7 @@ pub fn run() -> Result<(), error::Error> {
 
     if args.help {
         ::args::print_usage(&args.program_name);
-        return Ok(())
+        return Ok(());
     }
 
     let (sources, bads) = try!(source::Sources::from_paths(args.paths));
@@ -49,7 +49,7 @@ pub fn run() -> Result<(), error::Error> {
     }
 
     if sources.len() == 0 {
-        return Err(error::Error::NoSourcesError)
+        return Err(error::Error::NoSourcesError);
     }
 
     let conversions = try!(conversion::Conversions::from_sources(sources));
@@ -69,10 +69,8 @@ fn print_bads(bads: &[source::Error]) {
     println!("Skipping non video/audio files:");
     for error in bads {
         let path = match *error {
-            source::Error::FFProbeError { ref path, .. }
-            | source::Error::PathError { ref path, ..} => {
-                path.to_string_lossy()
-            }
+            source::Error::FFProbeError { ref path, .. } |
+            source::Error::PathError { ref path, .. } => path.to_string_lossy(),
         };
         println!("    {}", path)
     }

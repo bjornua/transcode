@@ -3,6 +3,7 @@ use rustc_serialize::json;
 use std::error::Error as StdError;
 use std::fmt;
 use std::ffi::OsStr;
+use std::io;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Video {
@@ -35,34 +36,22 @@ impl FFProbe {
     }
 }
 
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug)]
 pub enum Error {
-    JsonError { input: String },
-    DurationError { input: String },
-    StreamError { input: String },
-    VideoCodecNameError { input: String },
-    AudioCodecNameError { input: String },
-    HeightError { input: String },
-    WidthError { input: String },
-    FPSError { input: String },
-    RunError { output: String },
+    ParseError(ParseError),
+    RunError(RunError),
 }
-
-use self::Error::*;
-
-
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            JsonError { .. } => "Could not parse JSON",
-            DurationError { .. } => "Could not get duration from JSON",
-            StreamError { .. } => "Could not get streams from JSON",
-            VideoCodecNameError { .. } => "Could not get codec name from video stream",
-            AudioCodecNameError { .. } => "Could not get codec name from audio stream",
-            HeightError { .. } => "Could not get height from video stream",
-            WidthError { .. } => "Could not get width from video stream",
-            FPSError { .. } => "Could not get fps from video stream",
-            RunError { .. } => "Running \"ffprobe\" failed",
+            Error::RunError(_) => "An error happened while running ffprobe",
+            Error::ParseError(_) => "An error happedn while parsing the output from ffprobe",
+        }
+    }
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            Error::RunError(ref e) => Some(e),
+            Error::ParseError(ref e) => Some(e),
         }
     }
 }
@@ -72,17 +61,99 @@ impl fmt::Display for Error {
     }
 }
 
-pub fn ffprobe<T: AsRef<OsStr>>(path: T) -> Result<FFProbe, Error> {
-    let text = match ffprobe_run(path.as_ref()) {
-        Err(e) => return Err(e),
-        Ok(t) => t,
-    };
 
-    return ffprobe_parse(text);
+#[derive(Debug)]
+pub enum ParseError {
+    JsonError { input: String },
+    DurationError { input: String },
+    StreamError { input: String },
+    VideoCodecNameError { input: String },
+    AudioCodecNameError { input: String },
+    HeightError { input: String },
+    WidthError { input: String },
+    FPSError { input: String },
+    RunError(RunError),
+}
+
+#[derive(Debug)]
+pub enum RunError {
+    OutputCaptureError(io::Error),
+    StdOutUTF8Error(::std::string::FromUtf8Error),
+    StdErrUTF8Error(::std::string::FromUtf8Error),
+    OutputError {
+        exit_code: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+}
+
+impl StdError for RunError {
+    fn description(&self) -> &str {
+        match *self {
+            RunError::OutputCaptureError(_) => "An error happened while trying to capture output",
+            RunError::StdOutUTF8Error(_) => "Could not parse stdout as UTF-8",
+            RunError::StdErrUTF8Error(_) => "Could not parse stderr as UTF-8",
+            RunError::OutputError { .. } => "Exit code was non zero or stderr was not empty",
+        }
+    }
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            RunError::OutputCaptureError(ref e) => Some(e),
+            RunError::StdOutUTF8Error(ref e) => Some(e),
+            RunError::StdErrUTF8Error(ref e) => Some(e),
+            RunError::OutputError { .. } => None,
+
+        }
+    }
+}
+impl fmt::Display for RunError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl StdError for ParseError {
+    fn description(&self) -> &str {
+        use self::ParseError::*;
+        match *self {
+            JsonError { .. } => "Could not parse JSON",
+            DurationError { .. } => "Could not get duration from JSON",
+            StreamError { .. } => "Could not get streams from JSON",
+            VideoCodecNameError { .. } => "Could not get codec name from video stream",
+            AudioCodecNameError { .. } => "Could not get codec name from audio stream",
+            HeightError { .. } => "Could not get height from video stream",
+            WidthError { .. } => "Could not get width from video stream",
+            FPSError { .. } => "Could not get fps from video stream",
+            RunError(_) => "Running \"ffprobe\" failed",
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(err: ParseError) -> Self {
+        Error::ParseError(err)
+    }
+}
+impl From<RunError> for Error {
+    fn from(err: RunError) -> Self {
+        Error::RunError(err)
+    }
+}
+
+
+pub fn ffprobe<T: AsRef<OsStr>>(path: T) -> Result<FFProbe, Error> {
+    let text = try!(ffprobe_run(path.as_ref()));
+    return ffprobe_parse(text).map_err(|e| e.into());
 
 }
 
-fn ffprobe_run(path: &OsStr) -> Result<String, Error> {
+fn ffprobe_run(path: &OsStr) -> Result<String, RunError> {
     let mut c = Command::new("ffprobe");
     c.args(&[OsStr::new("-print_format"),
              OsStr::new("json"),
@@ -93,19 +164,25 @@ fn ffprobe_run(path: &OsStr) -> Result<String, Error> {
              OsStr::new("-show_format"),
              path]);
 
-    let result = c.output().unwrap();
-    let stdout = String::from_utf8(result.stdout).unwrap();
-    let stderr = String::from_utf8(result.stderr).unwrap();
-    let status = result.status.code().unwrap();
+    let result = try!(c.output().map_err(|e| RunError::OutputCaptureError(e)));
+    let stdout = try!(String::from_utf8(result.stdout).map_err(|e| RunError::StdOutUTF8Error(e)));
+    let stderr = try!(String::from_utf8(result.stderr).map_err(|e| RunError::StdErrUTF8Error(e)));
 
-    match (status, stderr.len()) {
-        (0, 0) => Ok(stdout),
-        (_, 0) => Err(RunError { output: stdout.trim().to_string() }),
-        (_, _) => Err(RunError { output: stderr.trim().to_string() }),
+    match (result.status.success(), stderr.len()) {
+        (true, 0) => Ok(stdout),
+        (_, _) => {
+            Err(RunError::OutputError {
+                exit_code: result.status.code(),
+                stderr: stderr,
+                stdout: stdout,
+            })
+        }
     }
 }
 
-fn ffprobe_parse(text: String) -> Result<FFProbe, Error> {
+
+fn ffprobe_parse(text: String) -> Result<FFProbe, ParseError> {
+    use self::ParseError::*;
     let json = match json::Json::from_str(&text).ok() {
         Some(c) => c,
         None => return Err(JsonError { input: text }),

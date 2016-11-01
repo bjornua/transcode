@@ -55,7 +55,7 @@ pub struct Args {
     pub program_name: String,
     pub paths: Vec<String>,
     pub dry_run: bool,
-    pub help: bool
+    pub help: bool,
 }
 
 impl Args {
@@ -81,7 +81,7 @@ impl Args {
         let help = args.opt_present("help");
         let paths = match args.free.len() {
             0 => vec![".".to_string()],
-            _ => args.free
+            _ => args.free,
         };
 
 
