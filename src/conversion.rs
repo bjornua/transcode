@@ -75,8 +75,16 @@ impl Conversions {
             return Err(Error::TargetDirExists {target_dir: target_dir})
         }
 
-        let conversions: Vec<_> = (paths).into_iter().zip(s).zip(0..).map(
-            |((path, source), id)| Conversion::new(id, reprefix(&path, &target_dir, base_path_len), source)
+        let target_paths = paths.into_iter().map(
+            |path| convert_path(&path, &target_dir, base_path_len, "mkv".as_ref())
+        );
+
+        let conversions: Vec<_> = (target_paths).into_iter().zip(s).zip(0..).map(
+            |((target_path, source), id)| Conversion::new(
+                id,
+                target_path,
+                source
+            )
         ).collect();
 
         Ok(Conversions(conversions))
@@ -171,8 +179,9 @@ impl DerefMut for Conversions {
     fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
-fn reprefix(p: &PathBuf, new_prefix: &PathBuf, count: usize) -> PathBuf {
-    let unprefixed: PathBuf = p.into_iter().skip(count).collect();
+fn convert_path(p: &PathBuf, new_prefix: &PathBuf, count: usize, extension: &OsStr) -> PathBuf {
+    let mut unprefixed: PathBuf = p.into_iter().skip(count).collect();
+    unprefixed.set_extension(extension);
     new_prefix.join(unprefixed)
 }
 
