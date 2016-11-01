@@ -59,13 +59,17 @@ pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
     pub fn from_sources(s: Sources) -> Result<Conversions, Error> {
+        if s.len() == 0 {
+            return Ok(Conversions(Vec::new()));
+        }
+
         let paths: Vec<_> = s.iter().map(|s| s.path.clone()).collect();
 
         use std::ffi::OsString;
         let (base_path_len, target_dir): (usize, PathBuf) = {
             let mut base_path: Vec<OsString> = get_longest_prefix(&paths).into_iter().map(|x| x.to_os_string()).collect();
             let base_path_len = base_path.len();
-            let mut folder_name = base_path.pop().unwrap().to_os_string();
+            let mut folder_name = base_path.pop().unwrap_or_else(|| OsString::new());
             folder_name.push(" - Converted");
             base_path.push(folder_name);
             (base_path_len, base_path.into_iter().collect())
