@@ -55,24 +55,24 @@ pub fn pretty_centiseconds(num: i64) -> String {
 
 #[test]
 fn test() {
-    for &(centiseconds, s) in &[(0000, "00.00"),
-                                (0001, "00.01"),
-                                (0002, "00.02"),
-                                (0009, "00.09"),
-                                (0010, "00.10"),
-                                (0011, "00.11"),
-                                (DSECONDS_MINUTES - 1, "59.99"),
-                                (DSECONDS_MINUTES, "01:00.00"),
-                                (DSECONDS_MINUTES + 1, "01:00.01"),
-                                (DSECONDS_HOURS - 1, "59:59.99"),
-                                (DSECONDS_HOURS, "01:00:00.00"),
-                                (DSECONDS_HOURS + 1, "01:00:00.01"),
-                                (DSECONDS_DAYS - 1, "23:59:59.99"),
-                                (DSECONDS_DAYS, "1d 00:00:00.00"),
-                                (DSECONDS_DAYS + 1, "1d 00:00:00.01"),
-                                (DSECONDS_YEARS - 1, "364d 23:59:59.99"),
-                                (DSECONDS_YEARS, "1y 0d 00:00:00.00"),
-                                (DSECONDS_YEARS + 1, "1y 0d 00:00:00.01")] {
+    for &(centiseconds, s) in &[(0000, "00.00s"),
+                                (0001, "00.01s"),
+                                (0002, "00.02s"),
+                                (0009, "00.09s"),
+                                (0010, "00.10s"),
+                                (0011, "00.11s"),
+                                (DSECONDS_MINUTES - 1, "59.99s"),
+                                (DSECONDS_MINUTES, "01:00.00s"),
+                                (DSECONDS_MINUTES + 1, "01:00.01s"),
+                                (DSECONDS_HOURS - 1, "59:59.99s"),
+                                (DSECONDS_HOURS, "01:00:00.00s"),
+                                (DSECONDS_HOURS + 1, "01:00:00.01s"),
+                                (DSECONDS_DAYS - 1, "23:59:59.99s"),
+                                (DSECONDS_DAYS, "1d 00:00:00.00s"),
+                                (DSECONDS_DAYS + 1, "1d 00:00:00.01s"),
+                                (DSECONDS_YEARS - 1, "364d 23:59:59.99s"),
+                                (DSECONDS_YEARS, "1y 0d 00:00:00.00s"),
+                                (DSECONDS_YEARS + 1, "1y 0d 00:00:00.01s")] {
         assert_eq!(pretty_centiseconds(centiseconds as i64), String::from(s))
     }
 }

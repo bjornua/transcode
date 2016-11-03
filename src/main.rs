@@ -1,5 +1,6 @@
 pub mod args;
 pub mod conversion;
+pub mod check_file;
 pub mod error;
 pub mod ffmpeg;
 pub mod ffprobe;
@@ -12,6 +13,7 @@ pub mod table;
 pub mod target;
 pub mod time;
 pub mod utils;
+pub mod constants;
 extern crate regex;
 extern crate rustc_serialize;
 extern crate getopts;
@@ -65,20 +67,17 @@ pub fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
-fn print_bads(bads: &[source::Error]) {
+use std::path::PathBuf;
+fn print_bads(bads: &[PathBuf]) {
     println!("Skipping non video/audio files:");
-    for error in bads {
-        let path = match *error {
-            source::Error::FFProbeError { ref path, .. } |
-            source::Error::PathError { ref path, .. } => path.to_string_lossy(),
-        };
-        println!("    {}", path)
+    for path in bads {
+        println!("      {}", path.to_string_lossy());
     }
 }
 
 fn print_sources(sources: &conversion::Conversions) {
     println!("Converting: ");
     for con in sources.iter() {
-        println!("    {}", con.source.path.to_string_lossy());
+        println!("{: >4}: {}", con.id, con.source.path.to_string_lossy());
     }
 }

@@ -229,7 +229,7 @@ pub fn status_sum<'a, T: IntoIterator<Item = &'a Status>>(statuses: T) -> Option
 }
 
 
-impl<'a> From<&'a Status> for Cow<'a, str> {
+impl<'a> From<&'a Status> for Cow<'static, str> {
     fn from(s: &'a Status) -> Self {
         match *s {
             Status::Pending(_) => Borrowed("       "),
@@ -238,12 +238,12 @@ impl<'a> From<&'a Status> for Cow<'a, str> {
         }
     }
 }
-impl<'a> From<Status> for Cow<'a, str> {
-    fn from(s: Status) -> Self {
-        match s {
-            Status::Pending(_) => Borrowed("       "),
-            Status::Done(_) => Borrowed("Done"),
-            Status::Progress(s) => Owned(format!("{:6.2}%", s.percentage())),
-        }
-    }
-}
+// impl<'a> From<Status> for Cow<'a, str> {
+//     fn from(s: Status) -> Self {
+//         match s {
+//             Status::Pending(_) => Borrowed("       "),
+//             Status::Done(_) => Borrowed("Done"),
+//             Status::Progress(s) => Owned(format!("{:6.2}%", s.percentage())),
+//         }
+//     }
+// }

@@ -36,6 +36,7 @@ impl StdError for Error {
         }
     }
 }
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -92,7 +93,7 @@ impl FFmpegIterator {
         if dry_run {
             args.extend(&[OsStr::new("-y"), OsStr::new("/dev/null")]);
         } else {
-            args.extend(&[con.target.path.as_ref()]);
+            args.extend(&[con.target.path.as_os_str()]);
         }
 
         c.args(args.as_slice());

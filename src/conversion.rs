@@ -12,7 +12,7 @@ use utils::erase_up;
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
-    id: u64,
+    pub id: u64,
     pub source: Source,
     pub target: Target,
     pub status: Status,
@@ -102,15 +102,16 @@ impl Conversions {
     }
     pub fn print_table(&self) -> usize {
         use table::print_table;
-        use table::Cell::{self, Text, Empty};
+        use table::Cell::{self, Text, Empty, Integer};
         use table::Alignment::{Left, Right};
         use time::pretty_centiseconds;
         use strings::truncate_left;
         use std::iter::once;
+        use std::borrow::Cow;
         fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
             Text(Right(pretty_centiseconds((n * 100.).round() as i64).into()))
         }
-        fn eta<'a>(s: &Status) -> Cell<'a> {
+        fn eta<'a, 'b>(s: &'b Status) -> Cell<'a> {
             match *s {
                 Status::Pending(_) => Empty,
                 Status::Progress(ref p) => p.eta().map_or(Empty, seconds_to_cell),
@@ -120,30 +121,35 @@ impl Conversions {
 
         fn row<'a>(c: &'a Conversion) -> Vec<Cell<'a>> {
             vec![
+                Integer(Cow::Owned(c.id as i64)),
                 Text(Left(truncate_left(c.target.path.to_string_lossy(), "...", 60))),
                 Text(Left((&c.status).into())),
                 eta(&c.status),
             ]
         }
 
-        let conversions = self.into_iter().map(row).chain(once(vec![]));
+        let conversions = self.into_iter().filter(|c| match c.status { Status::Progress(_) => true, _ => false }).map(row).chain(once(vec![]));
+
 
         let global_status: Option<Status> = status_sum(self.into_iter()
             .map(|&Conversion { ref status, .. }| status));
 
         let sums = match global_status {
             Some(ref global_status) => {
+                let count = self.into_iter().count();
                 vec![vec![],
-                     vec![Text(Left("Total".into())),
+                     vec![Integer(Cow::Owned(count as i64)),
+                          Text(Left("Total".into())),
                           Text(Left(global_status.into())),
-                          eta(global_status)]]
+                          eta(global_status),
+                      ]]
             }
             None => vec![],
         };
 
         let data = conversions.chain(sums);
 
-        print_table(Some(vec!["Path", "Status", "Eta", ""]), data)
+        print_table(Some(vec!["Num", "Path", "Status", "Eta", ""]), data)
     }
 
     pub fn convert(mut self, dry_run: bool) -> Result<(), (ffmpeg::Error)> {

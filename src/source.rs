@@ -6,6 +6,7 @@ use std::io;
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use check_file;
 
 #[derive(Debug)]
 pub enum Error {
@@ -14,13 +15,22 @@ pub enum Error {
         error: ffprobe::Error,
     },
     PathError { path: PathBuf, error: io::Error },
+    CheckFileError(check_file::Error),
 }
+
+impl From<check_file::Error> for Error {
+    fn from(err: check_file::Error) -> Self {
+        Error::CheckFileError(err)
+    }
+}
+
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::FFProbeError { ref error, .. } => error.description(),
+            Error::FFProbeError { .. } => "FFProbe error",
             Error::PathError { .. } => "Could not expand path",
+            Error::CheckFileError(_) => "Error happened while checking file",
         }
     }
 
@@ -28,6 +38,7 @@ impl StdError for Error {
         match *self {
             Error::FFProbeError { ref error, .. } => Some(error),
             Error::PathError { ref error, .. } => Some(error),
+            Error::CheckFileError(ref error) => Some(error),
         }
     }
 }
@@ -35,20 +46,18 @@ impl StdError for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::PathError { ref path, .. } => {
+            Error::PathError { ref path, .. } | Error::FFProbeError { ref path, .. }  => {
                 write!(f,
                        "{desc}: {path:?}",
                        desc = self.description(),
                        path = path)
             }
-            Error::FFProbeError { .. } => write!(f, "{}", self.description()),
+            Error::CheckFileError(_) => write!(f, "{}", self.description())
         }
     }
 }
 
-type SourceOk<T> = Result<T, Error>;
-
-type SourceResult = SourceOk<Source>;
+type SourceResult<T> = Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub struct Source {
@@ -97,7 +106,7 @@ impl DerefMut for Sources {
 }
 
 impl Sources {
-    pub fn from_paths<T, U>(paths: T) -> Result<(Self, Vec<Error>), Error>
+    pub fn from_paths<T, U>(paths: T) -> SourceResult<(Self, Vec<PathBuf>)>
         where T: IntoIterator<Item = U>,
               PathBuf: From<U>
     {
@@ -114,21 +123,20 @@ impl Sources {
         expanded_paths.sort();
         expanded_paths.dedup();
 
-        let sources = expanded_paths.into_iter().map(|path| {
-            ffprobe_it(&path).map(|probe| {
-                Source {
-                    path: path,
-                    ffprobe: probe,
-                }
-            })
-        });
+        // Quick filtering using 'file'
+        let (paths, skipped_file) = try!(check_file::check_files(expanded_paths.into_iter()));
+        let skipped_file = skipped_file.into_iter();
 
-        let (good, ffprobe_fail): (Vec<_>, Vec<_>) = sources.partition(|x| x.is_ok());
+        let sources: Result<Vec<_>, Error> = paths.into_iter().map(|path| {
+            ffprobe_it(&path).map(|probe| (path, probe))
+        }).collect();
 
-        let good = good.into_iter().filter_map(|x| x.ok());
-        let ffprobe_fail = ffprobe_fail.into_iter().filter_map(|x| x.err());
+        let (good, skipped_ffprobe): (Vec<_>, Vec<_>) = try!(sources).into_iter().partition(|&(_, ref probe)| probe.is_some());
 
-        Ok((Sources(good.collect()), ffprobe_fail.collect()))
+        let good = good.into_iter().filter_map(|(path, probe)| probe.map(|probe| Source { ffprobe: probe, path:path }));
+        let skipped_ffprobe = skipped_ffprobe.into_iter().map(|(path, _)| path);
+
+        Ok((Sources(good.collect()), skipped_file.chain(skipped_ffprobe).collect()))
     }
 }
 
@@ -162,7 +170,7 @@ fn expand_path(path: PathBuf) -> Vec<PathBuf> {
     return paths;
 }
 
-fn ffprobe_it(path: &PathBuf) -> SourceOk<ffprobe::FFProbe> {
+fn ffprobe_it(path: &PathBuf) -> SourceResult<Option<ffprobe::FFProbe>> {
     use self::Error::FFProbeError;
 
     let res = ffprobe::ffprobe(path);
