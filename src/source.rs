@@ -73,7 +73,7 @@ type SourceResult<T> = Result<T, Error>;
 #[derive(Debug, Clone)]
 pub struct BasedPath {
     pub path: PathBuf,
-    pub base: PathBuf
+    pub base: PathBuf,
 }
 impl BasedPath {
     pub fn relative(&self) -> PathBuf {
@@ -172,7 +172,12 @@ impl Sources {
         // Quick filtering using 'file'
         let (paths, skipped_file) = try!(check_file::check_files(expanded_paths.into_iter()));
 
-        let skipped_file = skipped_file.into_iter().map(|p| BasedPath {path: p, base: base_directory.clone()});
+        let skipped_file = skipped_file.into_iter().map(|p| {
+            BasedPath {
+                path: p,
+                base: base_directory.clone(),
+            }
+        });
 
         let sources: Result<Vec<_>, Error> = paths.into_iter()
             .map(|path| ffprobe_it(&path).map(|probe| (path, probe)))
@@ -185,11 +190,19 @@ impl Sources {
             probe.map(|probe| {
                 Source {
                     ffprobe: probe,
-                    path: BasedPath{ path: path, base: base_directory.clone() },
+                    path: BasedPath {
+                        path: path,
+                        base: base_directory.clone(),
+                    },
                 }
             })
         });
-        let skipped_ffprobe = skipped_ffprobe.into_iter().map(|(path, _)| BasedPath{ path: path, base: base_directory.clone() });
+        let skipped_ffprobe = skipped_ffprobe.into_iter().map(|(path, _)| {
+            BasedPath {
+                path: path,
+                base: base_directory.clone(),
+            }
+        });
 
         Ok((Sources(good.collect()), skipped_file.chain(skipped_ffprobe).collect()))
     }

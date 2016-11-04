@@ -71,7 +71,9 @@ impl Conversion {
 pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
-    pub fn from_sources(s: Sources, target_dir: &str) -> Result<(Conversions, Vec<PathBuf>), Error> {
+    pub fn from_sources(s: Sources,
+                        target_dir: &str)
+                        -> Result<(Conversions, Vec<PathBuf>), Error> {
         let target_dir = Path::new(&target_dir);
         let extension = OsStr::new("mkv");
 
@@ -81,8 +83,10 @@ impl Conversions {
 
         let sources = s.into_iter()
             .map(|source| {
-                target::Target::new(target_dir, &source.path.relative(), extension).map(|t| (t, source))
-            }).map(|result| {
+                target::Target::new(target_dir, &source.path.relative(), extension)
+                    .map(|t| (t, source))
+            })
+            .map(|result| {
                 match result {
                     Ok(s) => Ok(Ok(s)),
                     Err(target::Error::Exists { path }) => Ok(Err(path)),

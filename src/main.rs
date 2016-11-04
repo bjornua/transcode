@@ -44,7 +44,8 @@ pub fn run() -> Result<(), error::Error> {
     }
 
     let (sources, bads) = try!(source::Sources::from_paths(args.paths, &args.source_dir));
-    let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources, &args.target_dir));
+    let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources,
+                                                                            &args.target_dir));
 
     print_bads(&bads);
 

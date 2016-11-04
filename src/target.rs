@@ -69,8 +69,13 @@ impl Target {
         let path = prefix.join(path.with_extension(extension));
 
         let path = match path::normalize(&path) {
-            Err(e) => return Err(Error::NormalizeError { path: path, error: e }),
-            Ok(p) => p
+            Err(e) => {
+                return Err(Error::NormalizeError {
+                    path: path,
+                    error: e,
+                })
+            }
+            Ok(p) => p,
         };
 
         if path.exists() {

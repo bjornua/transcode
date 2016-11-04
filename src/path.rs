@@ -115,15 +115,14 @@ pub fn normalize(path: &Path) -> Result<PathBuf, io::Error> {
                     result.pop();
                 }
             }
-            Component::RootDir | Component::Prefix(_) | Component::Normal(_) => {
+            Component::RootDir |
+            Component::Prefix(_) |
+            Component::Normal(_) => {
                 result.push(component);
             }
         }
     }
-    Ok(
-        result.into_iter().map(|x| x.as_os_str()
-    ).collect())
+    Ok(result.into_iter()
+        .map(|x| x.as_os_str())
+        .collect())
 }
-
-
-
