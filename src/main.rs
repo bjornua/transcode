@@ -1,6 +1,7 @@
 pub mod args;
-pub mod conversion;
 pub mod check_file;
+pub mod constants;
+pub mod conversion;
 pub mod error;
 pub mod ffmpeg;
 pub mod ffprobe;
@@ -13,10 +14,9 @@ pub mod table;
 pub mod target;
 pub mod time;
 pub mod utils;
-pub mod constants;
+extern crate getopts;
 extern crate regex;
 extern crate rustc_serialize;
-extern crate getopts;
 
 use std::process::exit;
 
@@ -43,41 +43,65 @@ pub fn run() -> Result<(), error::Error> {
         return Ok(());
     }
 
-    let (sources, bads) = try!(source::Sources::from_paths(args.paths));
+    let (sources, bads) = try!(source::Sources::from_paths(args.paths, &args.source_dir));
+    let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources, &args.target_dir));
 
-    if bads.len() > 0 {
-        print_bads(bads.as_slice());
-        println!("");
-    }
+    print_bads(&bads);
 
-    if sources.len() == 0 {
+    print_skipped(skipped.as_slice());
+
+    if conversions.len() == 0 {
         return Err(error::Error::NoSourcesError);
     }
 
-    let conversions = try!(conversion::Conversions::from_sources(sources));
-
-    print_sources(&conversions);
-    println!("");
+    print_conversions(&conversions, &args.target_dir);
 
     if utils::prompt_continue() {
         println!("");
         try!(conversions.convert(args.dry_run));
     }
-
     Ok(())
 }
 
 use std::path::PathBuf;
-fn print_bads(bads: &[PathBuf]) {
-    println!("Skipping non video/audio files:");
-    for path in bads {
-        println!("      {}", path.to_string_lossy());
+fn print_bads(paths: &[source::BasedPath]) {
+    if paths.len() == 0 {
+        return;
     }
+    println!("Skipping non video/audio files:");
+    for path in paths {
+        println!("      {}", path.relative().to_string_lossy());
+    }
+    println!("");
 }
 
-fn print_sources(sources: &conversion::Conversions) {
-    println!("Converting: ");
-    for con in sources.iter() {
-        println!("{: >4}: {}", con.id, con.source.path.to_string_lossy());
+fn print_skipped(paths: &[PathBuf]) {
+    if paths.len() == 0 {
+        return;
     }
+    println!("Skipping existing targets:");
+    for path in paths.into_iter() {
+        println!("      {}", path.to_string_lossy());
+    }
+    println!("");
+}
+
+fn print_conversions(conversions: &conversion::Conversions, dir: &str) {
+    use std::path::Path;
+    if conversions.len() == 0 {
+        return;
+    }
+
+    if let Ok(dir) = path::normalize(Path::new(dir)) {
+        println!("Converting to {:?}: ", dir);
+    } else {
+        println!("Converting: ");
+    }
+
+    for con in conversions.iter() {
+        println!("{: >4}: {}",
+                 con.id,
+                 con.source.path.relative().to_string_lossy());
+    }
+    println!("");
 }

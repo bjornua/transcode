@@ -6,7 +6,6 @@ use std::fmt;
 use std::io::{self, Read};
 use std::process::{self, Command, Stdio};
 use std::str;
-use path;
 
 #[derive(Debug)]
 pub enum Error {
@@ -20,7 +19,9 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::MkDirError(_) => "Could not make directory",
-            Error::SpawnError(ref e) if e.kind() == io::ErrorKind::NotFound => "Could not spawn ffmpeg (is ffmpeg installed?)",
+            Error::SpawnError(ref e) if e.kind() == io::ErrorKind::NotFound => {
+                "Could not spawn ffmpeg (is ffmpeg installed?)"
+            }
             Error::SpawnError(_) => "Could not spawn ffmpeg",
             Error::NoStderr => "There was no stderr in ffmpeg command for some reason",
             Error::OutputError { .. } => "FFmpeg outputted something unexpected",
@@ -61,7 +62,7 @@ pub struct FFmpegIterator {
     read_once: bool,
 }
 impl FFmpegIterator {
-    pub fn new(con: conversion::Conversion, dry_run: bool) -> Result<Self, Error> {
+    pub fn new(con: &conversion::Conversion, dry_run: bool) -> Result<Self, Error> {
         let mut c = Command::new("ffmpeg");
 
         let mut args: Vec<&OsStr> = Vec::new();
@@ -70,7 +71,7 @@ impl FFmpegIterator {
                       OsStr::new("-f"),
                       OsStr::new("matroska")]);
 
-        if let Some(video) = con.source.ffprobe.video {
+        if let Some(ref video) = con.source.ffprobe.video {
             if video.codec == "h264" {
                 // Already the right codec, just copy
                 args.extend(&[OsStr::new("-c:v"), OsStr::new("copy")]);
@@ -93,7 +94,7 @@ impl FFmpegIterator {
         if dry_run {
             args.extend(&[OsStr::new("-y"), OsStr::new("/dev/null")]);
         } else {
-            args.extend(&[con.target.path.as_os_str()]);
+            args.extend(&[con.target.path_tmp.as_os_str()]);
         }
 
         c.args(args.as_slice());
@@ -102,9 +103,6 @@ impl FFmpegIterator {
         c.stdout(Stdio::piped());
         c.stdin(Stdio::null());
 
-        if !dry_run {
-            try!(path::mkdir_parent(&con.target.path).map_err(|e| Error::MkDirError(e)));
-        }
         let mut child = try!(c.spawn().map_err(|e| Error::SpawnError(e)));
         let stderr = child.stderr.take();
         let stdout = child.stdout.take();

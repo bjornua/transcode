@@ -2,7 +2,7 @@ use std::env::current_dir;
 use std::ffi::OsStr;
 use std::fs::{ReadDir, create_dir_all};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf, Component};
 use utils::common_prefix;
 
 #[derive(Debug)]
@@ -76,14 +76,14 @@ impl Iterator for RecursivePathIterator {
     }
 }
 
-pub fn find_relative(a: &Path, b: &Path) -> PathBuf {
-    let a: Vec<_> = a.iter().collect();
-    let b: Vec<_> = b.iter().collect();
+pub fn find_relative(target: &Path, base: &Path) -> PathBuf {
+    let target: Vec<_> = target.iter().collect();
+    let base: Vec<_> = base.iter().collect();
 
-    let common = common_prefix(a.as_slice(), b.as_slice()).len();
+    let common = common_prefix(target.as_slice(), base.as_slice()).len();
 
-    let dots = b[common..].into_iter().map(|_| OsStr::new(".."));
-    let path = a[common..].into_iter().map(|&x| x);
+    let dots = base[common..].into_iter().map(|_| OsStr::new(".."));
+    let path = target[common..].into_iter().map(|&x| x);
 
     dots.chain(path).collect()
 }
@@ -99,3 +99,31 @@ pub fn mkdir_parent(path: &Path) -> io::Result<()> {
     };
     create_dir_all(parent)
 }
+
+
+// Make absolute path and resolve dots (. and ..)
+pub fn normalize(path: &Path) -> Result<PathBuf, io::Error> {
+    let path = try!(current_dir()).join(path);
+
+    let mut result: Vec<Component> = Vec::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => (),
+            Component::ParentDir => {
+                if let Some(&Component::Normal(_)) = result.last() {
+                    result.pop();
+                }
+            }
+            Component::RootDir | Component::Prefix(_) | Component::Normal(_) => {
+                result.push(component);
+            }
+        }
+    }
+    Ok(
+        result.into_iter().map(|x| x.as_os_str()
+    ).collect())
+}
+
+
+

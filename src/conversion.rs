@@ -5,44 +5,49 @@ use std::error::Error as StdError;
 use std::ffi::OsStr;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
-use target::Target;
-use utils::common_prefix;
+use std::path::{PathBuf, Path};
+use target;
 use utils::erase_up;
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
     pub id: u64,
     pub source: Source,
-    pub target: Target,
+    pub target: target::Target,
     pub status: Status,
 }
 
 #[derive(Debug)]
 pub enum Error {
-    TargetDirExists { target_dir: PathBuf },
+    FFmpegError {
+        conversion: Conversion,
+        error: ffmpeg::Error,
+    },
+    TargetError(target::Error),
 }
+
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::TargetDirExists { .. } => "Target directory exists",
+            Error::TargetError(_) => "Target error",
+            Error::FFmpegError { .. } => "FFmpeg error",
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            Error::TargetDirExists { .. } => None,
+            Error::TargetError(ref error) => Some(error),
+            Error::FFmpegError { ref error, .. } => Some(error),
         }
     }
 }
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::TargetDirExists { ref target_dir } => {
-                write!(f,
-                       "{}: {}",
-                       self.description(),
-                       target_dir.to_string_lossy())
+            Error::TargetError(_) => write!(f, "{}", self.description()),
+            Error::FFmpegError { ref conversion, .. } => {
+                write!(f, "{}: {:?}", self.description(), conversion)
             }
         }
 
@@ -50,9 +55,9 @@ impl fmt::Display for Error {
 }
 
 impl Conversion {
-    pub fn new(id: u64, path: PathBuf, source: Source) -> Self {
+    pub fn new(id: u64, target: target::Target, source: Source) -> Self {
         let status = Status::new(source.ffprobe.mpixel());
-        let target = Target { path: path };
+
         Conversion {
             id: id,
             target: target,
@@ -66,39 +71,37 @@ impl Conversion {
 pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
-    pub fn from_sources(s: Sources) -> Result<Conversions, Error> {
+    pub fn from_sources(s: Sources, target_dir: &str) -> Result<(Conversions, Vec<PathBuf>), Error> {
+        let target_dir = Path::new(&target_dir);
+        let extension = OsStr::new("mkv");
+
         if s.len() == 0 {
-            return Ok(Conversions(Vec::new()));
+            return Ok((Conversions(Vec::new()), Vec::new()));
         }
 
-        let paths: Vec<_> = s.iter().map(|s| s.path.clone()).collect();
+        let sources = s.into_iter()
+            .map(|source| {
+                target::Target::new(target_dir, &source.path.relative(), extension).map(|t| (t, source))
+            }).map(|result| {
+                match result {
+                    Ok(s) => Ok(Ok(s)),
+                    Err(target::Error::Exists { path }) => Ok(Err(path)),
+                    Err(e) => Err(Error::TargetError(e)),
+                }
+            });
 
-        use std::ffi::OsString;
-        let (base_path_len, target_dir): (usize, PathBuf) = {
-            let mut base_path: Vec<OsString> =
-                get_longest_prefix(&paths).into_iter().map(|x| x.to_os_string()).collect();
-            let base_path_len = base_path.len();
-            let mut folder_name = base_path.pop().unwrap_or_else(|| OsString::new());
-            folder_name.push(" - Converted");
-            base_path.push(folder_name);
-            (base_path_len, base_path.into_iter().collect())
-        };
+        let sources: Result<Vec<_>, Error> = sources.collect();
 
-        if target_dir.exists() {
-            return Err(Error::TargetDirExists { target_dir: target_dir });
-        }
+        let (good, skipped): (Vec<_>, Vec<_>) = try!(sources).into_iter().partition(|r| r.is_ok());
+        let good = good.into_iter().filter_map(|s| s.ok());
+        let skipped = skipped.into_iter().filter_map(|s| s.err());
 
-        let target_paths = paths.into_iter()
-            .map(|path| convert_path(&path, &target_dir, base_path_len, "mkv".as_ref()));
+        let conversions = good.zip(0..)
+            .map(|((target, source), id)| Conversion::new(id, target, source));
 
-        let conversions: Vec<_> = (target_paths)
-            .into_iter()
-            .zip(s)
-            .zip(0..)
-            .map(|((target_path, source), id)| Conversion::new(id, target_path, source))
-            .collect();
 
-        Ok(Conversions(conversions))
+
+        Ok((Conversions(conversions.collect()), skipped.collect()))
     }
     pub fn print_table(&self) -> usize {
         use table::print_table;
@@ -108,6 +111,7 @@ impl Conversions {
         use strings::truncate_left;
         use std::iter::once;
         use std::borrow::Cow;
+
         fn seconds_to_cell<'a>(n: f64) -> Cell<'a> {
             Text(Right(pretty_centiseconds((n * 100.).round() as i64).into()))
         }
@@ -128,7 +132,13 @@ impl Conversions {
             ]
         }
 
-        let conversions = self.into_iter().filter(|c| match c.status { Status::Progress(_) => true, _ => false }).map(row).chain(once(vec![]));
+        let conversions = self.into_iter()
+            .filter(|c| match c.status {
+                Status::Progress(_) => true,
+                _ => false,
+            })
+            .map(row)
+            .chain(once(vec![]));
 
 
         let global_status: Option<Status> = status_sum(self.into_iter()
@@ -152,7 +162,7 @@ impl Conversions {
         print_table(Some(vec!["Num", "Path", "Status", "Eta", ""]), data)
     }
 
-    pub fn convert(mut self, dry_run: bool) -> Result<(), (ffmpeg::Error)> {
+    pub fn convert(mut self, dry_run: bool) -> Result<(), Error> {
         let mut lines = 0;
         for n in 0..self.len() {
             // Okay, hope this scope thing is going to be better in the future :)
@@ -160,9 +170,40 @@ impl Conversions {
                 let ref mut c = self[n];
                 (c.source.ffprobe.mpixel(), c.clone())
             };
-            for time in try!(ffmpeg::FFmpegIterator::new(ffmpeg_con, dry_run)) {
+
+            if !dry_run {
+                match ffmpeg_con.target.mkdir_parent() {
+                    Ok(()) => (),
+                    Err(e) => return Err(Error::TargetError(e)),
+                }
+            }
+
+            match ffmpeg_con.target.remove_path_tmp() {
+                Err(e) => return Err(Error::TargetError(e)),
+                Ok(true) | Ok(false) => (),
+            }
+
+            let ffmpegiter = match ffmpeg::FFmpegIterator::new(&ffmpeg_con, dry_run) {
+                Ok(iter) => iter,
+                Err(e) => {
+                    return Err(Error::FFmpegError {
+                        conversion: ffmpeg_con,
+                        error: e,
+                    })
+                }
+            };
+
+            for time in ffmpegiter {
                 {
-                    let time = try!(time);
+                    let time = match time {
+                        Ok(t) => t,
+                        Err(e) => {
+                            return Err(Error::FFmpegError {
+                                conversion: ffmpeg_con,
+                                error: e,
+                            })
+                        }
+                    };
                     let ref mut c = self[n];
                     let local_progress = time / c.source.ffprobe.duration * local_mpixel;
                     c.status.update(local_progress);
@@ -171,6 +212,10 @@ impl Conversions {
                 lines = self.print_table();
             }
             {
+                match ffmpeg_con.target.rename_path_tmp() {
+                    Err(e) => return Err(Error::TargetError(e)),
+                    Ok(()) => (),
+                }
                 let ref mut c = self[n];
                 c.status.end();
             };
@@ -196,28 +241,23 @@ impl DerefMut for Conversions {
     }
 }
 
-fn convert_path(p: &PathBuf, new_prefix: &PathBuf, count: usize, extension: &OsStr) -> PathBuf {
-    let mut unprefixed: PathBuf = p.into_iter().skip(count).collect();
-    unprefixed.set_extension(extension);
-    new_prefix.join(unprefixed)
-}
 
-fn get_longest_prefix<'a>(paths: &'a [PathBuf]) -> Vec<&'a OsStr> {
-    let components: Vec<_> = paths.into_iter()
-        .map(|p| {
-            let mut p: Vec<_> = p.into_iter().collect();
-            p.pop();
-            p
-        })
-        .collect();
+// fn get_longest_prefix<'a>(paths: &'a [PathBuf]) -> Vec<&'a OsStr> {
+//     let components: Vec<_> = paths.into_iter()
+//         .map(|p| {
+//             let mut p: Vec<_> = p.into_iter().collect();
+//             p.pop();
+//             p
+//         })
+//         .collect();
 
-    let mut iter = components.iter();
-    let longest = match iter.next() {
-        Some(s) => s.as_slice(),
-        None => &[],
-    };
+//     let mut iter = components.iter();
+//     let longest = match iter.next() {
+//         Some(s) => s.as_slice(),
+//         None => &[],
+//     };
 
-    let longest = iter.fold(longest, |longest, new| common_prefix(longest, new));
+//     let longest = iter.fold(longest, |longest, new| common_prefix(longest, new));
 
-    (longest).into_iter().map(|&x| x).collect()
-}
+//     (longest).into_iter().map(|&x| x).collect()
+// }

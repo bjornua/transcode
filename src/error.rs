@@ -75,16 +75,17 @@ pub fn print_error(e: &Error) {
 pub fn print_arg_error(e: &args::Error) {
     use args::Error::*;
     match *e {
-        MissingProgramName => (),
-        MissingInputs { ref program_name } => {
+        MissingTargetDir { ref program_name } |
+        MissingSourceDir { ref program_name } => {
             println!("Error: {}.", e);
             println!("");
             args::print_usage(program_name);
         }
         GetOptsFail { ref program_name, ref error } => {
-            println!("{:?}", error);
+            println!("{}", error);
             args::print_usage(program_name);
         }
+        MissingProgramName => println!("{}", e),
     }
 }
 

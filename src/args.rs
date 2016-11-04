@@ -5,7 +5,8 @@ use getopts::{self, Options};
 #[derive(Debug)]
 pub enum Error {
     MissingProgramName,
-    MissingInputs { program_name: String },
+    MissingTargetDir { program_name: String },
+    MissingSourceDir { program_name: String },
     GetOptsFail {
         program_name: String,
         error: getopts::Fail,
@@ -17,14 +18,16 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             MissingProgramName => "Missing program name (argv[0])",
-            MissingInputs { .. } => "No inputs specified",
+            MissingTargetDir { .. } => "No TARGET_DIRECTORY specified",
+            MissingSourceDir { .. } => "No SOURCE_DIRECTORY specified",
             GetOptsFail { .. } => "Argument error",
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
             MissingProgramName => None,
-            MissingInputs { .. } => None,
+            MissingTargetDir { .. } => None,
+            MissingSourceDir { .. } => None,
             GetOptsFail { ref error, .. } => Some(error),
         }
     }
@@ -35,7 +38,6 @@ impl fmt::Display for Error {
     }
 }
 
-
 pub fn opts() -> Options {
     let mut opts = Options::new();
     opts.optflag("d", "dry-run", "No paths are created or updated");
@@ -44,7 +46,8 @@ pub fn opts() -> Options {
 }
 
 pub fn print_usage(program_name: &str) {
-    let brief = format!("Usage: {} [OPTION]... [PATH]...", program_name);
+    let brief = format!("Usage: {} [OPTION]... TARGET_DIRECTORY SOURCE_DIRECTORY [SOURCE_FILE]...",
+                        program_name);
     println!("{}", opts().usage(&brief));
 }
 
@@ -53,6 +56,8 @@ pub fn print_usage(program_name: &str) {
 #[derive(Debug)]
 pub struct Args {
     pub program_name: String,
+    pub source_dir: String,
+    pub target_dir: String,
     pub paths: Vec<String>,
     pub dry_run: bool,
     pub help: bool,
@@ -79,17 +84,24 @@ impl Args {
         };
         let dry_run = args.opt_present("dry-run");
         let help = args.opt_present("help");
-        let paths = match args.free.len() {
-            0 => vec![".".to_string()],
-            _ => args.free,
+
+        let (target_dir, source_dir, mut files) = match (args.free.len(), args.free) {
+            (0, _) => return Err(Error::MissingTargetDir { program_name: program_name }),
+            (1, _) => return Err(Error::MissingSourceDir { program_name: program_name }),
+            (_, a) => (a[0].clone(), a[1].clone(), Vec::from(&a[2..])),
         };
 
+        if files.len() == 0 {
+            files = vec![source_dir.clone()];
+        }
 
         Ok(Args {
             program_name: program_name,
+            target_dir: target_dir,
+            source_dir: source_dir,
             dry_run: dry_run,
             help: help,
-            paths: paths,
+            paths: files,
         })
     }
     pub fn from_env() -> Result<Args, Error> {
