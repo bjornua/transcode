@@ -1,4 +1,3 @@
-
 use std::borrow::Cow;
 
 pub fn truncate_middle<'a>(a: Cow<'a, str>,

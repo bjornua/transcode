@@ -18,6 +18,7 @@ extern crate getopts;
 extern crate regex;
 extern crate rustc_serialize;
 
+use std::path::{Path, PathBuf};
 use std::process::exit;
 
 pub fn main() {
@@ -64,7 +65,6 @@ pub fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
-use std::path::PathBuf;
 fn print_bads(paths: &[source::BasedPath]) {
     if paths.len() == 0 {
         return;
@@ -88,7 +88,6 @@ fn print_skipped(paths: &[PathBuf]) {
 }
 
 fn print_conversions(conversions: &conversion::Conversions, dir: &str) {
-    use std::path::Path;
     if conversions.len() == 0 {
         return;
     }
