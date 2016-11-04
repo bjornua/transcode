@@ -85,7 +85,7 @@ pub fn print_arg_error(e: &args::Error) {
             println!("{}", error);
             args::print_usage(program_name);
         }
-        MissingProgramName => println!("{}", e),
+        MissingProgramName | Help { .. } => println!("{}", e),
     }
 }
 

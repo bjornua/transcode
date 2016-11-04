@@ -1,6 +1,6 @@
 [package]
 name = "transcode"
-version = "0.1.0"
+version = "0.2.0"
 authors = [ "Bjørn Uhre Arnholtz <rugkiks@gmail.com>" ]
 description = "Command-line utility for converting directories of audio/video format to run on a raspberry pi."
 repository = "https://github.com/bjornua/transcode"

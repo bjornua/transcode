@@ -26,7 +26,6 @@ pub enum Error {
     TargetError(target::Error),
 }
 
-
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {

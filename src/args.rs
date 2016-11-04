@@ -11,6 +11,7 @@ pub enum Error {
         program_name: String,
         error: getopts::Fail,
     },
+    Help { program_name: String },
 }
 use self::Error::*;
 
@@ -21,11 +22,13 @@ impl StdError for Error {
             MissingTargetDir { .. } => "No TARGET_DIRECTORY specified",
             MissingSourceDir { .. } => "No SOURCE_DIRECTORY specified",
             GetOptsFail { .. } => "Argument error",
+            Help { .. } => "Help specified",
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
             MissingProgramName => None,
+            Help { .. } => None,
             MissingTargetDir { .. } => None,
             MissingSourceDir { .. } => None,
             GetOptsFail { ref error, .. } => Some(error),
@@ -46,9 +49,9 @@ pub fn opts() -> Options {
 }
 
 pub fn print_usage(program_name: &str) {
-    let brief = format!("Usage: {} [OPTION]... TARGET_DIRECTORY SOURCE_DIRECTORY [SOURCE_FILE]...",
+    let brief = format!("Usage: {} [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...",
                         program_name);
-    println!("{}", opts().usage(&brief));
+    print!("{}", opts().usage(&brief));
 }
 
 
@@ -60,7 +63,6 @@ pub struct Args {
     pub target_dir: String,
     pub paths: Vec<String>,
     pub dry_run: bool,
-    pub help: bool,
 }
 
 impl Args {
@@ -82,12 +84,15 @@ impl Args {
                 })
             }
         };
-        let dry_run = args.opt_present("dry-run");
-        let help = args.opt_present("help");
+        if args.opt_present("help") {
+            return Err(Error::Help { program_name: program_name });
+        }
 
-        let (target_dir, source_dir, mut files) = match (args.free.len(), args.free) {
-            (0, _) => return Err(Error::MissingTargetDir { program_name: program_name }),
-            (1, _) => return Err(Error::MissingSourceDir { program_name: program_name }),
+        let dry_run = args.opt_present("dry-run");
+
+        let (source_dir, target_dir, mut files) = match (args.free.len(), args.free) {
+            (0, _) => return Err(Error::MissingSourceDir { program_name: program_name }),
+            (1, _) => return Err(Error::MissingTargetDir { program_name: program_name }),
             (_, a) => (a[0].clone(), a[1].clone(), Vec::from(&a[2..])),
         };
 
@@ -100,7 +105,6 @@ impl Args {
             target_dir: target_dir,
             source_dir: source_dir,
             dry_run: dry_run,
-            help: help,
             paths: files,
         })
     }

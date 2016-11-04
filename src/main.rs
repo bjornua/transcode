@@ -27,6 +27,10 @@ pub fn main() {
             error::print_error(&error::Error::NoSourcesError);
             0
         }
+        Err(error::Error::ArgError(args::Error::Help { program_name })) => {
+            ::args::print_usage(&program_name);
+            0
+        }
         Err(e) => {
             error::print_error(&e);
             1
@@ -38,11 +42,6 @@ pub fn main() {
 
 pub fn run() -> Result<(), error::Error> {
     let args = try!(args::Args::from_env());
-
-    if args.help {
-        ::args::print_usage(&args.program_name);
-        return Ok(());
-    }
 
     let (sources, bads) = try!(source::Sources::from_paths(args.paths, &args.source_dir));
     let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources,
