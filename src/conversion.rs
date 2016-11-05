@@ -123,6 +123,7 @@ impl Conversions {
                 Status::Pending(_) => Empty,
                 Status::Progress(ref p) => p.eta().map_or(Empty, seconds_to_cell),
                 Status::Done(ref p) => seconds_to_cell(p.duration),
+                Status::Fail(ref p) => seconds_to_cell(p.duration),
             }
         }
 
@@ -165,9 +166,9 @@ impl Conversions {
         print_table(Some(vec!["Num", "Path", "Status", "Eta", ""]), data)
     }
 
-    pub fn convert(mut self, dry_run: bool) -> Result<(), Error> {
+    pub fn convert<F: FnMut(Error)>(mut self, dry_run: bool, mut on_error: F) {
         let mut lines = 0;
-        for n in 0..self.len() {
+        'convert_loop: for n in 0..self.len() {
             // Okay, hope this scope thing is going to be better in the future :)
             let (local_mpixel, ffmpeg_con): (f64, Conversion) = {
                 let ref mut c = self[n];
@@ -177,49 +178,81 @@ impl Conversions {
             if !dry_run {
                 match ffmpeg_con.target.mkdir_parent() {
                     Ok(()) => (),
-                    Err(e) => return Err(Error::TargetError(e)),
+                    Err(e) => {
+                        on_error(Error::TargetError(e));
+                        let ref mut c = self[n];
+                        erase_up(lines);
+                        lines = 0;
+                        c.status.fail();
+                        continue 'convert_loop;
+                    }
                 }
             }
 
             match ffmpeg_con.target.remove_path_tmp() {
-                Err(e) => return Err(Error::TargetError(e)),
+                Err(e) => {
+                    erase_up(lines);
+                    lines = 0;
+                    on_error(Error::TargetError(e));
+                    let ref mut c = self[n];
+                    c.status.fail();
+                    continue 'convert_loop;
+                }
                 Ok(true) | Ok(false) => (),
             }
 
             let ffmpegiter = match ffmpeg::FFmpegIterator::new(&ffmpeg_con, dry_run) {
                 Ok(iter) => iter,
                 Err(e) => {
-                    return Err(Error::FFmpegError {
+                    erase_up(lines);
+                    lines = 0;
+                    on_error(Error::FFmpegError {
                         conversion: ffmpeg_con,
                         error: e,
-                    })
+                    });
+                    let ref mut c = self[n];
+                    c.status.fail();
+                    continue 'convert_loop;
                 }
             };
 
             for time in ffmpegiter {
                 {
+                    let ref mut c = self[n];
                     let time = match time {
                         Ok(t) => t,
                         Err(e) => {
-                            return Err(Error::FFmpegError {
+                            erase_up(lines);
+                            lines = 0;
+                            on_error(Error::FFmpegError {
                                 conversion: ffmpeg_con,
                                 error: e,
-                            })
+                            });
+                            c.status.fail();
+                            continue 'convert_loop;
                         }
                     };
-                    let ref mut c = self[n];
                     let local_progress = time / c.source.ffprobe.duration * local_mpixel;
                     c.status.update(local_progress);
                 }
+
                 erase_up(lines);
                 lines = self.print_table();
             }
             {
-                match ffmpeg_con.target.rename_path_tmp() {
-                    Err(e) => return Err(Error::TargetError(e)),
-                    Ok(()) => (),
-                }
                 let ref mut c = self[n];
+                if !dry_run {
+                    match ffmpeg_con.target.rename_path_tmp() {
+                        Err(e) => {
+                            erase_up(lines);
+                            lines = 0;
+                            on_error(Error::TargetError(e));
+                            c.status.fail();
+                            continue 'convert_loop;
+                        }
+                        Ok(()) => { c.status.end(); }
+                    }
+                }
                 c.status.end();
             };
             erase_up(lines);
@@ -228,7 +261,6 @@ impl Conversions {
         erase_up(lines);
         self.print_table();
         print!("\n");
-        Ok(())
     }
 }
 

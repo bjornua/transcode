@@ -23,11 +23,31 @@ pub struct Done {
 }
 
 #[derive(Debug, Clone)]
+pub struct Fail {
+    pub begin: Instant,
+    pub duration: f64,
+    target: f64,
+}
+
+#[derive(Debug, Clone)]
 pub enum Status {
     Pending(Pending),
     Progress(Progress),
     Done(Done),
+    Fail(Fail),
 }
+
+// impl<A,B,C> Merge<B> for A {
+//     fn merge(&self, other: &B) -> A {
+//         other.merge(self);
+//     }
+// }
+
+// impl Target for Progress {
+//     fn target(&self) -> f64 {
+//         self.target
+//     }
+// }
 
 impl Progress {
     pub fn percentage(&self) -> f64 {
@@ -61,6 +81,13 @@ impl Progress {
             target: self.target,
         }
     }
+    pub fn fail(&self) -> Fail {
+        Fail {
+            begin: self.begin,
+            duration: (self.elapsed_ns() as f64) / 1_000_000_000.,
+            target: self.target,
+        }
+    }
 }
 
 impl Pending {
@@ -88,6 +115,12 @@ impl From<Done> for Status {
         Status::Done(other)
     }
 }
+impl From<Fail> for Status {
+    fn from(other: Fail) -> Self {
+        Status::Fail(other)
+    }
+}
+
 
 impl Status {
     pub fn new(target: f64) -> Self {
@@ -106,18 +139,35 @@ impl Status {
             s.update(progress)
         }
     }
-    pub fn get_progress(&self) -> f64 {
+    pub fn fail(&mut self) {
+        *self = match *self {
+            Status::Progress(ref s) => s.fail().into(),
+            _ => return,
+        }
+    }
+    pub fn get_processed(&self) -> f64 {
         match *self {
             Status::Progress(Progress { processed, .. }) => processed,
-            Status::Done(Done { target, .. }) => target,
+            Status::Done(Done { target, .. }) |
+            Status::Fail(Fail { target, .. }) => target,
             Status::Pending(_) => 0.,
         }
     }
     pub fn get_target(&self) -> f64 {
         match *self {
-            Status::Progress(Progress { target, .. }) => target,
-            Status::Done(Done { target, .. }) => target,
+            Status::Progress(Progress { target, .. }) |
+            Status::Done(Done { target, .. }) |
+            Status::Fail(Fail { target, .. }) |
             Status::Pending(Pending { target, .. }) => target,
+        }
+    }
+    pub fn merge_begin(&self, &other: &Instant) -> Instant {
+        match *self {
+            Status::Pending(Pending { .. }) => other,
+            Status::Progress(Progress { begin, .. }) |
+            Status::Done(Done { begin, .. }) |
+            Status::Fail(Fail { begin, .. }) => min(begin, other),
+
         }
     }
     pub fn end(&mut self) {
@@ -127,12 +177,79 @@ impl Status {
             return;
         }
     }
+    pub fn merge(&self, other: &Self) -> Self {
+        let target = other.get_target() + self.get_target();
+        let processed = other.get_processed() + self.get_processed();
+
+        match *self {
+            Status::Progress(Progress { begin, .. }) => {
+                Progress {
+                        begin: other.merge_begin(&begin),
+                        processed: processed,
+                        target: target,
+                    }
+                    .into()
+            }
+            Status::Pending(_) => {
+                match *other {
+                    Status::Pending(_) => Pending { target: target }.into(),
+                    Status::Progress(_) => other.merge(self),
+                    Status::Done(Done { ref begin, .. }) |
+                    Status::Fail(Fail { ref begin, .. }) => {
+                        Progress {
+                                begin: *begin,
+                                processed: processed,
+                                target: target,
+                            }
+                            .into()
+                    }
+                }
+            }
+            Status::Done(Done { begin, duration, .. }) => {
+                match *other {
+                    Status::Done(ref s) => {
+                        Done {
+                                begin: min(begin, s.begin),
+                                target: target,
+                                duration: duration + s.duration,
+                            }
+                            .into()
+                    }
+                    Status::Pending(_) |
+                    Status::Progress(_) => other.merge(self),
+                    Status::Fail(Fail { begin, duration: duration_fail, .. }) => {
+                        Fail {
+                                duration: duration + duration_fail,
+                                begin: begin,
+                                target: target,
+                            }
+                            .into()
+                    }
+                }
+            }
+            Status::Fail(Fail { begin, duration, .. }) => {
+                match *other {
+                    Status::Fail(ref s) => {
+                        Fail {
+                                begin: min(begin, s.begin),
+                                target: target,
+                                duration: duration + s.duration,
+                            }
+                            .into()
+                    }
+                    Status::Pending(_) |
+                    Status::Progress(_) |
+                    Status::Done(_) => other.merge(self),
+                }
+            }
+        }
+    }
     pub fn bar(&self, width: usize) -> String {
 
         let width = width - 0;
         let bars = match *self {
             Status::Pending(_) => 0,
-            Status::Done(_) => width,
+            Status::Done(_) | Status::Fail(_) => width,
             Status::Progress(ref s) => (s.ratio() * (width as f64)).floor() as usize,
         };
 
@@ -154,76 +271,7 @@ pub fn status_sum<'a, T: IntoIterator<Item = &'a Status>>(statuses: T) -> Option
     };
 
     for status in statuses {
-        global_status = match (global_status, status) {
-            (Status::Pending(ref g), &Status::Pending(ref s)) => {
-                Pending { target: s.target + g.target }.into()
-            }
-            (Status::Pending(ref g), &Status::Progress(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: s.processed,
-                        begin: s.begin,
-                    }
-                    .into()
-            }
-            (Status::Pending(ref g), &Status::Done(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: s.target,
-                        begin: s.begin,
-                    }
-                    .into()
-            }
-            (Status::Progress(ref g), &Status::Pending(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: g.processed,
-                        begin: g.begin,
-                    }
-                    .into()
-            }
-            (Status::Progress(ref g), &Status::Progress(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: g.processed + s.processed,
-                        begin: min(s.begin, g.begin),
-                    }
-                    .into()
-            }
-            (Status::Progress(ref g), &Status::Done(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: g.processed + s.target,
-                        begin: min(s.begin, g.begin),
-                    }
-                    .into()
-            }
-            (Status::Done(ref g), &Status::Pending(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: g.target,
-                        begin: g.begin,
-                    }
-                    .into()
-            }
-            (Status::Done(ref g), &Status::Progress(ref s)) => {
-                Progress {
-                        target: s.target + g.target,
-                        processed: g.target + s.processed,
-                        begin: min(s.begin, g.begin),
-                    }
-                    .into()
-            }
-            (Status::Done(ref g), &Status::Done(ref s)) => {
-                Done {
-                        target: s.target + g.target,
-                        duration: g.duration + s.duration,
-                        begin: min(s.begin, g.begin),
-                    }
-                    .into()
-            }
-        }
-
+        global_status = global_status.merge(status);
     }
     Some(global_status)
 }
@@ -232,8 +280,9 @@ pub fn status_sum<'a, T: IntoIterator<Item = &'a Status>>(statuses: T) -> Option
 impl<'a> From<&'a Status> for Cow<'static, str> {
     fn from(s: &'a Status) -> Self {
         match *s {
-            Status::Pending(_) => Borrowed("       "),
             Status::Done(_) => Borrowed("Done"),
+            Status::Fail(_) => Borrowed("Failed"),
+            Status::Pending(_) => Borrowed("       "),
             Status::Progress(ref s) => Owned(format!("{:6.2}%", s.percentage())),
         }
     }

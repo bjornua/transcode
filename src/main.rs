@@ -35,18 +35,18 @@ pub fn main() {
             error::print_error(&e);
             1
         }
-        Ok(()) => 0,
+        Ok(false) => 1,
+        Ok(true) => 0,
     };
     exit(exit_code)
 }
 
-pub fn run() -> Result<(), error::Error> {
+pub fn run() -> Result<bool, error::Error> {
     let args = try!(args::Args::from_env());
 
     let (sources, bads) = try!(source::Sources::from_paths(args.paths, &args.source_dir));
     let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources,
                                                                             &args.target_dir));
-
     print_bads(&bads);
 
     print_skipped(skipped.as_slice());
@@ -57,11 +57,15 @@ pub fn run() -> Result<(), error::Error> {
 
     print_conversions(&conversions, &args.target_dir);
 
+    let mut fail = false;
     if utils::prompt_continue() {
         println!("");
-        try!(conversions.convert(args.dry_run));
+        conversions.convert(args.dry_run, |err| {
+            fail = true;
+            error::print_error(&err.into())
+        })
     }
-    Ok(())
+    Ok(fail)
 }
 
 fn print_bads(paths: &[source::BasedPath]) {
