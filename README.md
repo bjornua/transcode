@@ -5,12 +5,20 @@ Command-line utility for converting directories of audio/video format to run on 
 
 ## Example
 ```bash
-transcode ~/Videos/Family ~/Videos/Vacation
+transcode ~/Videos/ ~/ConvertedVideos
 ```
-* Creates directory: `~/Videos - Converted/`
-* Converts video/audio files in `~/Videos/Family` to `~/Videos - Converted/Family`
-* Converts video/audio files in `~/Videos/Vacation` to `~/Videos - Converted/Vacation`
 
+* Creates directory: `~/ConvertedVideos/`
+* Converts video/audio files in `~/Videos/` to `~/VideosConverted/`
+
+## Usage
+```
+Usage: target/debug/transcode [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...
+
+Options:
+    -d, --dry-run       No paths are created or updated
+    -h, --help          Display this help and exit
+```
 ## Features
 * Shows progress for individual files and total progress
 * Shows ETA for individual files and total ETA
