@@ -13,7 +13,7 @@ transcode ~/Videos/ ~/ConvertedVideos
 
 ## Usage
 ```
-Usage: target/debug/transcode [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...
+Usage: transcode [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...
 
 Options:
     -d, --dry-run       No paths are created or updated
