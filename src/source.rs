@@ -34,8 +34,8 @@ impl StdError for Error {
             Error::CheckFileError(_) => "Error happened while checking file",
             Error::FFProbeError { .. } => "FFProbe error",
             Error::PathError { .. } => "Could not expand path",
-            Error::SourceDirectory { .. } => "Error happened while resolving SOURCE_DIRECTORY",
-            Error::StraySource { .. } => "Path cannot be outside SOURCE_DIRECTORY",
+            Error::SourceDirectory { .. } => "Error happened while resolving INPUT_DIRECTORY",
+            Error::StraySource { .. } => "Path cannot be outside INPUT_DIRECTORY",
         }
     }
 

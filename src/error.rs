@@ -2,6 +2,8 @@ use args;
 use ffmpeg;
 use conversion;
 use source;
+use codecs;
+
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -12,6 +14,8 @@ pub enum Error {
     ConversionError(conversion::Error),
     SourceError(source::Error),
     NoSourcesError,
+    AtLeastOneItemFailed,
+    FormatError(codecs::Error),
 }
 
 impl From<ffmpeg::Error> for Error {
@@ -44,6 +48,8 @@ impl StdError for Error {
             Error::FFmpegError(_) => "FFmpeg error",
             Error::ConversionError(_) => "Conversion error",
             Error::NoSourcesError => "No sources were found",
+            Error::AtLeastOneItemFailed => "Once item failed to convert",
+            Error::FormatError(_) => "An error happened while parsing --format",
         }
     }
 
@@ -54,6 +60,8 @@ impl StdError for Error {
             Error::FFmpegError(ref e) => Some(e),
             Error::ConversionError(ref e) => Some(e),
             Error::NoSourcesError => None,
+            Error::AtLeastOneItemFailed => None,
+            Error::FormatError(ref e) => Some(e),
         }
     }
 }

@@ -8,6 +8,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::{PathBuf, Path};
 use target;
 use utils::erase_up;
+use codecs::container::Codec;
 
 #[derive(Debug, Clone)]
 pub struct Conversion {
@@ -71,7 +72,9 @@ pub struct Conversions(Vec<Conversion>);
 
 impl Conversions {
     pub fn from_sources(s: Sources,
-                        target_dir: &str)
+                        target_dir: &str,
+                        codec: Codec
+                        )
                         -> Result<(Conversions, Vec<PathBuf>), Error> {
         let target_dir = Path::new(&target_dir);
         let extension = OsStr::new("mkv");
@@ -82,7 +85,7 @@ impl Conversions {
 
         let sources = s.into_iter()
             .map(|source| {
-                target::Target::new(target_dir, &source.path.relative(), extension)
+                target::Target::new(target_dir, &source.path.relative(), extension, codec.clone())
                     .map(|t| (t, source))
             })
             .map(|result| {

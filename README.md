@@ -1,24 +1,27 @@
 # transcode
 [![Cargo version][cargo-image]][cargo-url]
 
-Command-line utility for converting directories of audio/video format to run on a raspberry pi.
+Transcode a directory of videos
 
 ## Example
 ```bash
 transcode ~/Videos/ ~/ConvertedVideos
 ```
-
-* Creates directory: `~/ConvertedVideos/`
 * Converts video/audio files in `~/Videos/` to `~/VideosConverted/`
 
-## Usage
+## Full Usage
 ```
-Usage: transcode [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...
+Usage: target/debug/transcode [OPTION]... INPUT_DIRECTORY OUTPUT_DIRECTORY [INPUT_FILE]...
 
 Options:
     -d, --dry-run       No paths are created or updated
     -h, --help          Display this help and exit
+    -f, --format        Set the output format
+
+Examples of the --format option:
+    --format=mkv,h264,18,normal,opus,192
 ```
+
 ## Features
 * Shows progress for individual files and total progress
 * Shows ETA for individual files and total ETA
@@ -30,7 +33,7 @@ Currently the only target format is hardcoded and is:
 
 | Container | Audio     | Video     |
 |-----------|-----------|-----------|
-|MKV        | Opus 192k | h.264 4.1 |
+| Matroska  | Opus 192k | h.264 4.1 |
 
 ## Installation
 * Install rust (https://www.rust-lang.org/en-US/downloads.html)

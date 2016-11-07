@@ -1,4 +1,6 @@
 pub mod args;
+pub mod codecs;
+
 pub mod check_file;
 pub mod constants;
 pub mod conversion;
@@ -34,19 +36,24 @@ pub fn main() {
         Err(e) => {
             error::print_error(&e);
             1
-        }
-        Ok(false) => 1,
-        Ok(true) => 0,
+        },
+        Ok(()) => 0
     };
     exit(exit_code)
 }
 
-pub fn run() -> Result<bool, error::Error> {
+pub fn run() -> Result<(), error::Error> {
     let args = try!(args::Args::from_env());
+
+    let codec = match codecs::get_container(args.format) {
+        Ok(c) => c,
+        Err(e) => return Err(error::Error::FormatError(e))
+    };
+
 
     let (sources, bads) = try!(source::Sources::from_paths(args.paths, &args.source_dir));
     let (conversions, skipped) = try!(conversion::Conversions::from_sources(sources,
-                                                                            &args.target_dir));
+                                                                            &args.target_dir, codec));
     print_bads(&bads);
 
     print_skipped(skipped.as_slice());
@@ -65,7 +72,11 @@ pub fn run() -> Result<bool, error::Error> {
             error::print_error(&err.into())
         })
     }
-    Ok(fail)
+    if fail {
+        return Err(error::Error::AtLeastOneItemFailed)
+    }
+
+    Ok(())
 }
 
 fn print_bads(paths: &[source::BasedPath]) {

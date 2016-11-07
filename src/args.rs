@@ -19,8 +19,8 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             MissingProgramName => "Missing program name (argv[0])",
-            MissingTargetDir { .. } => "No TARGET_DIRECTORY specified",
-            MissingSourceDir { .. } => "No SOURCE_DIRECTORY specified",
+            MissingTargetDir { .. } => "No OUTPUT_DIRECTORY specified",
+            MissingSourceDir { .. } => "No INPUT_DIRECTORY specified",
             GetOptsFail { .. } => "Argument error",
             Help { .. } => "Help specified",
         }
@@ -45,13 +45,21 @@ pub fn opts() -> Options {
     let mut opts = Options::new();
     opts.optflag("d", "dry-run", "No paths are created or updated");
     opts.optflag("h", "help", "Display this help and exit");
+    opts.optflag("f", "format", "Set the output format");
     opts
 }
 
 pub fn print_usage(program_name: &str) {
-    let brief = format!("Usage: {} [OPTION]... SOURCE_DIRECTORY TARGET_DIRECTORY [SOURCE_FILE]...",
+    let brief = format!("Usage: {} [OPTION]... INPUT_DIRECTORY OUTPUT_DIRECTORY [INPUT_FILE]...",
                         program_name);
     print!("{}", opts().usage(&brief));
+    use codecs;
+    use codecs::Codec;
+    println!("");
+    println!("Examples of the --format option:");
+    for example in codecs::container::Codec::to_examples() {
+        println!("    --format={}", example.join(","))
+    }
 }
 
 
@@ -63,6 +71,7 @@ pub struct Args {
     pub target_dir: String,
     pub paths: Vec<String>,
     pub dry_run: bool,
+    pub format: Option<String>,
 }
 
 impl Args {
@@ -89,6 +98,7 @@ impl Args {
         }
 
         let dry_run = args.opt_present("dry-run");
+        let format = args.opt_str("format");
 
         let (source_dir, target_dir, mut files) = match (args.free.len(), args.free) {
             (0, _) => return Err(Error::MissingSourceDir { program_name: program_name }),
@@ -106,6 +116,7 @@ impl Args {
             source_dir: source_dir,
             dry_run: dry_run,
             paths: files,
+            format: format,
         })
     }
     pub fn from_env() -> Result<Args, Error> {

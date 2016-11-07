@@ -6,11 +6,13 @@ use std::fs;
 use std::io;
 use std::path::{PathBuf, Path};
 use utils;
+use codecs::container::Codec;
 
 #[derive(Debug,Clone)]
 pub struct Target {
     pub path: PathBuf,
     pub path_tmp: PathBuf,
+    pub codec: Codec,
 }
 
 
@@ -65,7 +67,7 @@ impl fmt::Display for Error {
 }
 
 impl Target {
-    pub fn new(prefix: &Path, path: &Path, extension: &OsStr) -> Result<Self, Error> {
+    pub fn new(prefix: &Path, path: &Path, extension: &OsStr, codec: Codec) -> Result<Self, Error> {
         let path = prefix.join(path.with_extension(extension));
 
         let path = match path::normalize(&path) {
@@ -85,6 +87,7 @@ impl Target {
         let path_tmp = path_tmp(&path);
 
         Ok(Target {
+            codec: codec,
             path: path,
             path_tmp: path_tmp,
         })

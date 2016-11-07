@@ -1,7 +1,6 @@
 use conversion;
 use regexreader::RegexReadIterator;
 use std::error::Error as StdError;
-use std::ffi::OsStr;
 use std::fmt;
 use std::io::{self, Read};
 use std::process::{self, Command, Stdio};
@@ -65,36 +64,21 @@ impl FFmpegIterator {
     pub fn new(con: &conversion::Conversion, dry_run: bool) -> Result<Self, Error> {
         let mut c = Command::new("ffmpeg");
 
-        let mut args: Vec<&OsStr> = Vec::new();
-        args.extend(&[OsStr::new("-i"),
-                      con.source.path.as_ref(),
-                      OsStr::new("-f"),
-                      OsStr::new("matroska")]);
+        use std::ffi::OsString;
 
-        if let Some(ref video) = con.source.ffprobe.video {
-            if video.codec == "h264" {
-                // Already the right codec, just copy
-                args.extend(&[OsStr::new("-c:v"), OsStr::new("copy")]);
-            } else {
-                args.extend(&[OsStr::new("-c:v"),
-                              OsStr::new("libx264"),
-                              OsStr::new("-level"),
-                              OsStr::new("4.1"),
-                              OsStr::new("-preset"),
-                              OsStr::new("ultrafast"),
-                              OsStr::new("-crf"),
-                              OsStr::new("18")]);
-            }
-        }
-        args.extend(&[OsStr::new("-c:a"),
-                      OsStr::new("opus"),
-                      OsStr::new("-b:a"),
-                      OsStr::new("192k")]);
+        let mut args: Vec<OsString> = Vec::new();
+        args.push("-i".into());
+        args.push((*con.source.path).clone().into());
+
+        use codecs::Codec;
+
+        args.extend(con.target.codec.to_ffmpeg_args());
 
         if dry_run {
-            args.extend(&[OsStr::new("-y"), OsStr::new("/dev/null")]);
+            args.push("-y".into());
+            args.push("/dev/null".into());
         } else {
-            args.extend(&[con.target.path_tmp.as_os_str()]);
+            args.push(con.target.path_tmp.clone().into());
         }
 
         c.args(args.as_slice());
