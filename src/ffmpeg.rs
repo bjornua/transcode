@@ -1,6 +1,8 @@
+use codecs::Codec;
 use conversion;
 use regexreader::RegexReadIterator;
 use std::error::Error as StdError;
+use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Read};
 use std::process::{self, Command, Stdio};
@@ -64,13 +66,10 @@ impl FFmpegIterator {
     pub fn new(con: &conversion::Conversion, dry_run: bool) -> Result<Self, Error> {
         let mut c = Command::new("ffmpeg");
 
-        use std::ffi::OsString;
 
         let mut args: Vec<OsString> = Vec::new();
         args.push("-i".into());
         args.push((*con.source.path).clone().into());
-
-        use codecs::Codec;
 
         args.extend(con.target.codec.to_ffmpeg_args());
 

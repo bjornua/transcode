@@ -1,6 +1,8 @@
 use std::fmt;
 use std::error::Error as StdError;
 use getopts::{self, Options};
+use codecs;
+use codecs::Codec;
 
 #[derive(Debug)]
 pub enum Error {
@@ -13,25 +15,24 @@ pub enum Error {
     },
     Help { program_name: String },
 }
-use self::Error::*;
 
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            MissingProgramName => "Missing program name (argv[0])",
-            MissingTargetDir { .. } => "No OUTPUT_DIRECTORY specified",
-            MissingSourceDir { .. } => "No INPUT_DIRECTORY specified",
-            GetOptsFail { .. } => "Argument error",
-            Help { .. } => "Help specified",
+            Error::MissingProgramName => "Missing program name (argv[0])",
+            Error::MissingTargetDir { .. } => "No OUTPUT_DIRECTORY specified",
+            Error::MissingSourceDir { .. } => "No INPUT_DIRECTORY specified",
+            Error::GetOptsFail { .. } => "Argument error",
+            Error::Help { .. } => "Help specified",
         }
     }
     fn cause(&self) -> Option<&StdError> {
         match *self {
-            MissingProgramName => None,
-            Help { .. } => None,
-            MissingTargetDir { .. } => None,
-            MissingSourceDir { .. } => None,
-            GetOptsFail { ref error, .. } => Some(error),
+            Error::MissingProgramName => None,
+            Error::Help { .. } => None,
+            Error::MissingTargetDir { .. } => None,
+            Error::MissingSourceDir { .. } => None,
+            Error::GetOptsFail { ref error, .. } => Some(error),
         }
     }
 }
@@ -53,8 +54,6 @@ pub fn print_usage(program_name: &str) {
     let brief = format!("Usage: {} [OPTION]... INPUT_DIRECTORY OUTPUT_DIRECTORY [INPUT_FILE]...",
                         program_name);
     print!("{}", opts().usage(&brief));
-    use codecs;
-    use codecs::Codec;
     println!("");
     println!("Examples of the --format option:");
     for example in codecs::container::Codec::to_examples() {
@@ -80,7 +79,7 @@ impl Args {
 
         let program_name = match args.next() {
             Some(s) => s.clone(),
-            None => return Err(MissingProgramName),
+            None => return Err(Error::MissingProgramName),
         };
 
 
